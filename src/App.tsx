@@ -136,8 +136,20 @@ function App() {
 
             <Routes>
 
-              <Route path="/" element={<Index />} />
-
+<Route
+  path="/"
+  element={
+    user ? (
+      <ProtectedRoute>
+        <WithNav>
+          <Dashboard />
+        </WithNav>
+      </ProtectedRoute>
+    ) : (
+      <Index />
+    )
+  }
+/>
               <Route path="/login" element={<Login />} />
 
               <Route path="/signup" element={<Signup />} />
