@@ -9,9 +9,6 @@ export default function Chatbot() {
 
   const chatEndRef = useRef(null);
 
-  // ✅ use env variable
-const API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
-
   const systemPrompt = {
     role: "system",
     content:
@@ -57,25 +54,22 @@ const API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
         content: msg.text,
       }));
 
-      const res = await fetch(
-        "https://openrouter.ai/api/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "openai/gpt-3.5-turbo",
-            messages: [...formattedMessages, systemPrompt],
-          }),
-        }
-      );
+      // Route the request through the backend so the API key stays server-side.
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messages: formattedMessages,
+          systemPrompt: systemPrompt.content,
+          model: "openai/gpt-3.5-turbo",
+        }),
+      });
 
       const data = await res.json();
 
-      const botReply =
-        data?.choices?.[0]?.message?.content || "No response 😅";
+      const botReply = data?.reply || "No response 😅";
 
       const botMsg = { role: "assistant", text: botReply };
 

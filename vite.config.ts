@@ -12,6 +12,14 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
+    // Forward /api requests to the Express backend during development so the
+    // OpenRouter API key stays on the server and is never included in the bundle.
+    proxy: {
+      "/api": {
+        target: "http://localhost:3001",
+        changeOrigin: true,
+      },
+    },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
