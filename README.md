@@ -97,7 +97,8 @@ A modern peer-to-peer learning platform where students can connect, collaborate,
 
 ---
 ## Demo Video
- [Watch Demo Video](./assets/demo.mp4)
+ [Watch Demo ](
+ https://github.com/user-attachments/assets/6af694a1-e98d-4d31-b99f-eeacddab3ebc)
 
 # 🧠 Problem Statement
 
