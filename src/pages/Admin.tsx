@@ -106,16 +106,16 @@ const Admin = () => {
     }).length;
   };
 
-  const calculateActiveTodayCount = (userList: UserProfile[]): number => {
-    const now = new Date();
-    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  // const calculateActiveTodayCount = (userList: UserProfile[]): number => {
+  //   const now = new Date();
+  //   const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     
-    return userList.filter(u => {
-      if (!u.last_active_at) return false;
-      const lastActive = new Date(u.last_active_at);
-      return lastActive >= oneDayAgo;
-    }).length;
-  };
+  //   return userList.filter(u => {
+  //     if (!u.last_active_at) return false;
+  //     const lastActive = new Date(u.last_active_at);
+  //     return lastActive >= oneDayAgo;
+  //   }).length;
+  // };
 
   const filteredUsers = users.filter(
     (u) =>
