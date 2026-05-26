@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
@@ -17,6 +17,7 @@ import Chatbot from "./components/Chatbot";
 import StudyRooms from "./components/StudyRooms";
 import Room from "./components/Room";
 import StreakBadge from "./components/StreakBadge";
+import FloatingAI from "./components/FloatingAI";
 
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -37,14 +38,14 @@ import Leaderboard from "./pages/Leaderboard";
 import Admin from "./pages/Admin";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import AnonymousDoubts from "./pages/AnonymousDoubts";
 import AIPage from "./pages/aipage";
-import FloatingAI from "./components/FloatingAI";
 import ContributorDashboard from "./pages/ContributorDashboard";
-const ResourceHub = React.lazy(() => import("@/pages/ResourceHub"));
-
-import { supabase } from "@/integrations/supabase/client";
 import BecomeMentor from "./pages/BecomeMentor";
+
 import { useAuth } from "@/contexts/useAuth";
+
+const ResourceHub = React.lazy(() => import("@/pages/ResourceHub"));
 
 const queryClient = new QueryClient();
 
@@ -58,7 +59,6 @@ const WithNav = ({ children }: { children: React.ReactNode }) => (
 function AppContent() {
   const { user } = useAuth();
 
-  // ✨ Sparkle Effect
   useEffect(() => {
     const container = document.getElementById("sparkle-container");
     if (!container) return;
@@ -66,214 +66,230 @@ function AppContent() {
     const createSparkle = (x: number, y: number) => {
       const sparkle = document.createElement("div");
       sparkle.className = "sparkle";
-      sparkle.style.left = x + "px";
-      sparkle.style.top = y + "px";
+      sparkle.style.left = `${x}px`;
+      sparkle.style.top = `${y}px`;
       container.appendChild(sparkle);
-      setTimeout(() => {
-        sparkle.remove();
-      }, 800);
+
+      setTimeout(() => sparkle.remove(), 800);
     };
 
     const handleMouseMove = (e: MouseEvent) => {
       for (let i = 0; i < 2; i++) {
         createSparkle(
           e.clientX + Math.random() * 10 - 5,
-          e.clientY + Math.random() * 10 - 5
+          e.clientY + Math.random() * 10 - 5,
         );
       }
     };
 
     window.addEventListener("mousemove", handleMouseMove);
 
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-    };
+    return () => window.removeEventListener("mousemove", handleMouseMove);
   }, []);
 
   return (
     <>
       <div id="sparkle-container"></div>
       <StreakBadge />
-      <Routes>
-        <Route
-          path="/"
-          element={
-            user ? (
-              <Navigate to="/dashboard" replace />
-            ) : (
-              <Index />
-            )
-          }
-        />
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/onboarding" element={<Onboarding />} />
-        <Route path="/ai" element={<AIPage />} />
-        <Route
-          path="/forgot-password"
-          element={<ForgotPassword />}
-        />
-        <Route
-          path="/reset-password"
-          element={<ResetPassword />}
-        />
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
+
+      <Suspense fallback={<div>Loading...</div>}>
+        <Routes>
+          <Route
+            path="/"
+            element={user ? <Navigate to="/dashboard" replace /> : <Index />}
+          />
+
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/ai" element={<AIPage />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/become-mentor" element={<BecomeMentor />} />
+
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <WithNav>
+                  <Dashboard />
+                </WithNav>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/mentor-dashboard"
+            element={
+              <ProtectedMentorRoute>
+                <WithNav>
+                  <MentorDashboard />
+                </WithNav>
+              </ProtectedMentorRoute>
+            }
+          />
+
+          <Route
+            path="/learner-dashboard"
+            element={
+              <ProtectedRoute>
+                <WithNav>
+                  <LearnerDashboard />
+                </WithNav>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/rooms"
+            element={
+              <ProtectedRoute>
+                <WithNav>
+                  <StudyRooms />
+                </WithNav>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/rooms/:id"
+            element={
+              <ProtectedRoute>
+                <WithNav>
+                  <Room />
+                </WithNav>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/discover"
+            element={
+              <ProtectedRoute>
+                <WithNav>
+                  <Discover />
+                </WithNav>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/sessions"
+            element={
+              <ProtectedRoute>
+                <WithNav>
+                  <Sessions />
+                </WithNav>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/messages"
+            element={
+              <ProtectedRoute>
+                <WithNav>
+                  <Messages user={user} />
+                </WithNav>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/chat"
+            element={
+              <ProtectedRoute>
+                <WithNav>
+                  <Chat />
+                </WithNav>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/notifications"
+            element={
+              <ProtectedRoute>
+                <WithNav>
+                  <Notifications />
+                </WithNav>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/leaderboard"
+            element={
+              <ProtectedRoute>
+                <WithNav>
+                  <Leaderboard />
+                </WithNav>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/resources"
+            element={
+              <ProtectedRoute>
+                <WithNav>
+                  <ResourceHub />
+                </WithNav>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute>
+                <WithNav>
+                  <Admin />
+                </WithNav>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/edit-profile"
+            element={
+              <ProtectedRoute>
+                <EditProfile />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/anonymous-doubts"
+            element={
               <WithNav>
-                <Dashboard />
+                <AnonymousDoubts />
               </WithNav>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/mentor-dashboard"
-          element={
-            <ProtectedMentorRoute>
-              <WithNav>
-                <MentorDashboard />
-              </WithNav>
-            </ProtectedMentorRoute>
-          }
-        />
-        <Route
-          path="/learner-dashboard"
-          element={
-            <ProtectedRoute>
-              <WithNav>
-                <LearnerDashboard />
-              </WithNav>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/rooms"
-          element={
-            <ProtectedRoute>
-              <WithNav>
-                <StudyRooms />
-              </WithNav>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/rooms/:id"
-          element={
-            <ProtectedRoute>
-              <WithNav>
-                <Room />
-              </WithNav>
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/become-mentor" element={<BecomeMentor />} />
-        <Route
-          path="/discover"
-          element={
-            <ProtectedRoute>
-              <WithNav>
-                <Discover />
-              </WithNav>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/sessions"
-          element={
-            <ProtectedRoute>
-              <WithNav>
-                <Sessions />
-              </WithNav>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/messages"
-          element={
-            <ProtectedRoute>
-              <WithNav>
-                <Messages user={user} />
-              </WithNav>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/chat"
-          element={
-            <ProtectedRoute>
-              <WithNav>
-                <Chat />
-              </WithNav>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/notifications"
-          element={
-            <ProtectedRoute>
-              <WithNav>
-                <Notifications />
-              </WithNav>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/leaderboard"
-          element={
-            <ProtectedRoute>
-              <WithNav>
-                <Leaderboard />
-              </WithNav>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/resources"
-          element={
-            <ProtectedRoute>
-              <WithNav>
-                <ResourceHub />
-              </WithNav>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute>
-              <WithNav>
-                <Admin />
-              </WithNav>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoute>
-              <Profile />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/edit-profile"
-          element={
-            <ProtectedRoute>
-              <EditProfile />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="*" element={<NotFound />} />
-        <Route
-          path="/contributor-dashboard"
-          element={
+            }
+          />
+
+          <Route
+            path="/contributor-dashboard"
+            element={
               <WithNav>
                 <ContributorDashboard />
               </WithNav>
-          }
-        />
-      </Routes>
+            }
+          />
+
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
+
       <Chatbot />
     </>
   );
@@ -286,12 +302,14 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Sonner />
+
           <BrowserRouter>
             <AuthProvider>
               <RoleProvider>
                 <AppContent />
               </RoleProvider>
             </AuthProvider>
+
             <FloatingAI />
           </BrowserRouter>
         </TooltipProvider>
