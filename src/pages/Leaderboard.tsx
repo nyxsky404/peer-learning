@@ -42,37 +42,8 @@ const Leaderboard = () => {
 
     setLoading(true);
 
-    let query = supabase
-      .from("leaderboard" as any)
-      .select("*");
-
-    if (filter === "Weekly") {
-
-      const lastWeek = new Date();
-
-      lastWeek.setDate(lastWeek.getDate() - 7);
-
-      query = query.gte(
-        "updated_at",
-        lastWeek.toISOString()
-      );
-    }
-
-    if (filter === "Monthly") {
-
-      const lastMonth = new Date();
-
-      lastMonth.setMonth(lastMonth.getMonth() - 1);
-
-      query = query.gte(
-        "updated_at",
-        lastMonth.toISOString()
-      );
-    }
-
-    const { data, error } = await query.order("xp", {
-      ascending: false,
-    });
+    const { data, error } = await (supabase as any)
+      .rpc("get_leaderboard", { _timeframe: filter });
 
     if (!error && data) {
 
