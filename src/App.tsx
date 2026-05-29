@@ -292,7 +292,12 @@ function AppContent() {
         </Routes>
       </Suspense>
 
-      <Chatbot />
+      {user && (
+        <>
+          <Chatbot />
+          <FloatingAI />
+        </>
+      )}
     </>
   );
 }
@@ -311,8 +316,6 @@ function App() {
                 <AppContent />
               </RoleProvider>
             </AuthProvider>
-
-            <FloatingAI />
           </BrowserRouter>
         </TooltipProvider>
       </ThemeProvider>
