@@ -33,6 +33,8 @@ export default function MentorForm() {
 
   const [loading, setLoading] = useState(false);
 
+  const [error, setError] = useState("");
+
   const [formData, setFormData] = useState({
     full_name: "",
     college: "",
@@ -60,7 +62,28 @@ export default function MentorForm() {
         : [...prev.mentorship_types, type],
     }));
   };
+  const validateBasicInfo = () => {
+  return (
+    formData.full_name.trim() !== "" &&
+    formData.college.trim() !== "" &&
+    formData.bio.trim() !== ""
+  );
+};
 
+const validateSkills = () => {
+  return formData.skills.length > 0;
+};
+
+const validateExperience = () => {
+  return (
+    formData.github.trim() !== "" &&
+    formData.linkedin.trim() !== ""
+  );
+};
+
+const validateMentorship = () => {
+  return formData.mentorship_types.length > 0;
+};
   const handleSubmit = async () => {
     try {
       setLoading(true);
@@ -81,7 +104,7 @@ export default function MentorForm() {
 
       if (error) {
         console.error(error);
-        alert("Something went wrong!");
+        setError("Something went wrong!");
         return;
       }
 
@@ -286,7 +309,11 @@ export default function MentorForm() {
           </div>
         )}
       </motion.div>
-
+      {error && (
+          <div className="mt-6 rounded-2xl border border-fuchsia-400/40 bg-gradient-to-r from-fuchsia-500/30 via-pink-500/25 to-purple-500/30 px-5 py-4 text-sm font-semibold text-pink-100 shadow-lg shadow-pink-500/20 backdrop-blur-xl">
+            {error}
+          </div>
+      )}
       {/* Buttons */}
       {step !== 4 && (
         <div className="mt-10 flex justify-between">
@@ -300,7 +327,29 @@ export default function MentorForm() {
 
           {step < 3 ? (
             <button
-              onClick={() => setStep(step + 1)}
+             onClick={() => {
+              if (step === 0 && !validateBasicInfo()) {
+              setError("Please fill all basic information fields");
+              return;
+               }
+
+               if (step === 1 && !validateSkills()) {
+                setError("Please select at least one skill");
+                 return;
+                }
+
+                if (step === 2 && !validateExperience()) {
+                setError("Please fill GitHub and LinkedIn profiles");
+                return;
+                }
+
+                if (step === 3 && !validateMentorship()) {
+                setError("Please select at least one mentorship type");
+                return;
+                }
+                setError("");
+                setStep(step + 1);
+              }}
               className="rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 px-8 py-3 font-semibold text-black transition hover:scale-105"
             >
               Continue
