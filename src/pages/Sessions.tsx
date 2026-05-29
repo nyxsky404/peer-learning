@@ -49,6 +49,9 @@ const Sessions = () => {
   const [isVideoActive, setIsVideoActive] = useState(false);
 
   const messagesEndRef = useRef<any>(null);
+  
+  // Track sessions that have already granted XP to prevent infinite farming
+  const awardedSessions = useRef<Set<string>>(new Set());
 
   // FETCH SESSIONS
   useEffect(() => {
@@ -416,7 +419,11 @@ const Sessions = () => {
                 <button 
                   onClick={() => {
                     setIsVideoActive(true);
-                    awardXP({ activity: 'session_join' });
+                    // Prevent infinite XP farming loophole
+                    if (!awardedSessions.current.has(selectedSession.id)) {
+                      awardXP({ activity: 'session_join' });
+                      awardedSessions.current.add(selectedSession.id);
+                    }
                   }}
                   className="flex items-center gap-2 bg-gradient-to-r from-cyan-400 to-purple-500 text-black px-4 py-2 rounded-2xl font-bold hover:opacity-90 transition"
                 >
