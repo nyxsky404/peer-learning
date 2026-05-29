@@ -18,6 +18,6 @@ router.post("/ask", requireAuth, rateLimiter, askAI);
 /**
  * Session summary generator (new feature)
  */
-router.post("/generate-summary", generateSessionSummary);
+router.post("/generate-summary", rateLimiter, generateSessionSummary);
 
 export default router;
