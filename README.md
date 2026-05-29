@@ -46,6 +46,7 @@ A modern peer-to-peer learning platform where students can connect, collaborate,
 - [⚙️ Backend](#%E2%9A%99%EF%B8%8F-backend)
 - [🔐 Authentication](#%F0%9F%94%90-authentication-1)
 - [🚀 Deployment](#%F0%9F%9A%80-deployment)
+- [🏗️ System Architecture](#%F0%9F%8F%97%EF%B8%8F-system-architecture)
 - [📂 Project Structure](#%F0%9F%93%82-project-structure)
 - [⚙️ Installation & Setup](#%E2%9A%99%EF%B8%8F-installation--setup)
   * [1️⃣ Clone the Repository](#1%EF%B8%8F%E2%83%A3-clone-the-repository)
@@ -176,6 +177,46 @@ The **Peer Learning Platform** solves this challenge by enabling students to con
 
 # 🚀 Deployment
 - Vercel
+
+---
+
+# 🏗️ System Architecture
+
+```mermaid
+graph TD
+    subgraph Client [Client Side]
+        UI[React Frontend]
+    end
+
+    subgraph SupabasePlatform [Supabase Platform]
+        Auth[Authentication]
+        DB[(PostgreSQL Database)]
+        Realtime[Real-Time Chat System]
+    end
+
+    subgraph NodeBackend [Custom Backend]
+        AIAssistant[AI Integration API]
+    end
+
+    subgraph ExternalServices [External Services]
+        OpenRouter[OpenRouter / OpenAI API]
+    end
+
+    UI <-->|JWT Auth & User Sessions| Auth
+    UI <-->|CRUD Operations| DB
+    UI <-->|WebSockets| Realtime
+    UI -->|Ask AI / Summarize| AIAssistant
+    
+    AIAssistant -->|Verify Token| Auth
+    AIAssistant <-->|Generate Text| OpenRouter
+```
+
+- **React Frontend**: The client-side application built with React, TypeScript, and Tailwind CSS. Provides the UI for users to interact with the platform.
+- **Supabase Backend**: Handles core backend services.
+  - **Authentication Flow**: Manages user signup, login, and secure sessions via Supabase Auth.
+  - **PostgreSQL Database**: Stores user profiles, learning sessions, and messages securely.
+  - **Real-Time Chat System**: Uses Supabase Realtime for instant messaging and live typing indicators.
+- **AI Assistant Integration**: A custom Node.js/Express server connects to external AI APIs (OpenRouter) to provide smart recommendations and learning support securely.
 
 ---
 
