@@ -1,5 +1,6 @@
 import express from "express";
 import OpenAI from "openai";
+import { env } from "../config.js";
 import dotenv from "dotenv";
 import { requireAuth, requireProfileRole } from "../middlewares/requireAuth.js";
 import { protectedApiRateLimiter } from "../middlewares/rateLimiter.js";
@@ -10,10 +11,10 @@ const router = express.Router();
 // OpenRouter base URL. The API key is read from the server environment and is
 // never sent to the client.
 const openrouter = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY,   // must not be undefined
+  apiKey: env.OPENROUTER_API_KEY,   // must not be undefined
   baseURL: "https://openrouter.ai/api/v1",
   defaultHeaders: {
-    "HTTP-Referer": process.env.SITE_URL || "http://localhost:8080",
+    "HTTP-Referer": env.SITE_URL || "http://localhost:8080",
     "X-Title": "Peer Learning AI",
   },
 });

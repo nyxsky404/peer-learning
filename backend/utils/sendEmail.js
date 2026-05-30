@@ -1,8 +1,9 @@
 import nodemailer from "nodemailer";
+import { env } from "../config.js";
 
 export const sendEmail = async (email, url) => {
-  const emailUser = process.env.EMAIL_USER;
-  const emailPass = process.env.EMAIL_PASS;
+  const emailUser = env.EMAIL_USER;
+  const emailPass = env.EMAIL_PASS;
 
   if (!emailUser || !emailPass) {
     throw new Error(

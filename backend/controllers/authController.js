@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import User from "../models/User.js";
+import User from "../models/user.js";
+import { env } from "../config.js";
 import { sendEmail } from "../utils/sendEmail.js";
 
 const RESET_TOKEN_TTL_MS = 15 * 60 * 1000;
@@ -9,9 +10,9 @@ const GENERIC_RESET_MESSAGE =
 
 const buildFrontendBaseUrl = (req) => {
   const configuredBaseUrl =
-    process.env.PASSWORD_RESET_BASE_URL ||
-    process.env.FRONTEND_URL ||
-    process.env.CLIENT_URL;
+    env.PASSWORD_RESET_BASE_URL ||
+    env.FRONTEND_URL ||
+    env.CLIENT_URL;
 
   if (configuredBaseUrl) {
     return configuredBaseUrl;
