@@ -109,7 +109,7 @@ export default function MentorForm() {
         setLoading(false);
         return;
       }
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("mentors")
         .insert([
           {
