@@ -7,6 +7,8 @@ import {
   resetPasswordRateLimiter,
   signupRateLimiter,
 } from "../middlewares/rateLimiter.js";
+import { validateRequest } from "../middlewares/validateRequest.js";
+import { forgotPasswordSchema, resetPasswordSchema } from "../validations/schemas.js";
 
 const router = express.Router();
 
@@ -16,8 +18,8 @@ export const authRouteRateLimiters = {
   otpVerificationRateLimiter,
 };
 
-router.post("/forgot-password", forgotPasswordRateLimiter, forgotPassword);
-router.post("/reset-password/:token", resetPasswordRateLimiter, resetPassword);
+router.post("/forgot-password", forgotPasswordRateLimiter, validateRequest(forgotPasswordSchema), forgotPassword);
+router.post("/reset-password/:token", resetPasswordRateLimiter, validateRequest(resetPasswordSchema), resetPassword);
 router.post("/login", loginRateLimiter, (req, res) => {
   res.json({ message: "Login route working" });
 });
