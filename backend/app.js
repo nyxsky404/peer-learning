@@ -1,7 +1,6 @@
 import express from "express";
 import { randomUUID } from "crypto";
 import cors from "cors";
-import authRoutes from "./routers/authRoutes.js";
 import chatRoutes from "./routers/chatRoutes.js";
 import aiRoutes from "./routers/aiRoutes.js";
 import matchRoutes from "./routers/matchRoutes.js";
@@ -25,7 +24,6 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/api/ai", aiRoutes);
-app.use("/api", authRoutes);
 app.use("/api", chatRoutes);
 app.use("/api/match", matchRoutes);
 
