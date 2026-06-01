@@ -1,6 +1,5 @@
 import React, { useEffect, Suspense, useState, useRef } from "react";
-import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, Router } from "react-router-dom";
 
 import { Toaster } from "@/components/ui/toaster";
@@ -19,7 +18,7 @@ import Navbar from "./components/Navbar";
 import Chatbot from "./components/Chatbot";
 import StreakBadge from "./components/StreakBadge";
 import FloatingAI from "./components/FloatingAI";
-import Sparkles from "./components/Sparkles";
+import MouseSparkles from "./components/MouseSparkles";
 
 import { useAuth } from "@/contexts/useAuth";
 
@@ -55,20 +54,7 @@ const ResourceHub = React.lazy(() => import("@/pages/ResourceHub"));
 const StudyRooms = React.lazy(() => import("./components/StudyRooms"));
 const Room = React.lazy(() => import("./components/Room"));
 
-const queryClient = new QueryClient({
-  queryCache: new QueryCache({
-    onError: (error: any) => {
-      console.error("Global Query Error:", error);
-      toast.error(error.message || "Failed to load data. Please try again.");
-    },
-  }),
-  mutationCache: new MutationCache({
-    onError: (error: any) => {
-      console.error("Global Mutation Error:", error);
-      toast.error(error.message || "An action failed. Please try again.");
-    },
-  }),
-});
+const queryClient = new QueryClient();
 
 const WithNav = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
@@ -86,7 +72,7 @@ function AppContent() {
 
   return (
     <>
-      <Sparkles />
+      <MouseSparkles />
 
 
       <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#020617]"><div className="h-10 w-10 animate-spin rounded-full border-4 border-cyan-400 border-t-transparent" /></div>}>
