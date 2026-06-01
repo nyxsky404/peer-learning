@@ -1,107 +1,42 @@
-import { HttpError } from "../utils/httpError.js";
+const WINDOW_MS = 60 * 1000;
+const MAX_REQUESTS = 20;
+const MAX_ENTRIES = 10000;
+const CLEANUP_INTERVAL_MS = 60 * 1000;
 
-const DEFAULT_WINDOW_MS = 60 * 1000;
-const DEFAULT_MAX_REQUESTS = 20;
+const requestCounts = new Map();
 
-const requestBuckets = new Map();
-
-const getRequestIdentity = (req) => {
-  if (req.user?.id) {
-    return `user:${req.user.id}`;
+const evictStaleEntries = () => {
+  const now = Date.now();
+  for (const [key, entry] of requestCounts.entries()) {
+    if (now - entry.windowStart >= WINDOW_MS) {
+      requestCounts.delete(key);
+    }
   }
-
-  const forwardedFor = req.headers["x-forwarded-for"];
-  const forwardedIp = Array.isArray(forwardedFor)
-    ? forwardedFor[0]
-    : String(forwardedFor || "").split(",")[0];
-
-  const ipAddress = forwardedIp?.trim() || req.ip || req.socket?.remoteAddress || "unknown";
-  return `ip:${ipAddress}`;
 };
 
-const sweepExpiredBuckets = (windowMs) => {
+setInterval(evictStaleEntries, CLEANUP_INTERVAL_MS);
+
+export const rateLimiter = (req, res, next) => {
+  const userId = req.user?.id || req.ip;
   const now = Date.now();
 
-  for (const [key, bucket] of requestBuckets.entries()) {
-    if (now - bucket.windowStart >= windowMs) {
-      requestBuckets.delete(key);
-    }
+  if (requestCounts.size >= MAX_ENTRIES) {
+    evictStaleEntries();
   }
+
+  const entry = requestCounts.get(userId);
+
+  if (!entry || now - entry.windowStart >= WINDOW_MS) {
+    requestCounts.set(userId, { count: 1, windowStart: now });
+    return next();
+  }
+
+  if (entry.count >= MAX_REQUESTS) {
+    return res.status(429).json({
+      error: "Too many requests. Please wait before sending more messages.",
+    });
+  }
+
+  entry.count += 1;
+  next();
 };
-
-export const createRateLimiter = ({
-  windowMs = DEFAULT_WINDOW_MS,
-  maxRequests = DEFAULT_MAX_REQUESTS,
-  keyPrefix = "global",
-  message = "Too many requests. Please wait before trying again.",
-} = {}) => {
-  return (req, res, next) => {
-    sweepExpiredBuckets(windowMs);
-
-    const now = Date.now();
-    const bucketKey = `${keyPrefix}:${getRequestIdentity(req)}`;
-    const bucket = requestBuckets.get(bucketKey);
-
-    if (!bucket || now - bucket.windowStart >= windowMs) {
-      requestBuckets.set(bucketKey, { count: 1, windowStart: now });
-      return next();
-    }
-
-    if (bucket.count >= maxRequests) {
-      next(new HttpError(429, message));
-      return;
-    }
-
-    bucket.count += 1;
-    next();
-  };
-};
-
-export const loginRateLimiter = createRateLimiter({
-  keyPrefix: "login",
-  windowMs: 15 * 60 * 1000,
-  maxRequests: 5,
-  message: "Too many login attempts. Please wait before trying again.",
-});
-
-export const signupRateLimiter = createRateLimiter({
-  keyPrefix: "signup",
-  windowMs: 60 * 60 * 1000,
-  maxRequests: 3,
-  message: "Too many signup attempts. Please wait before trying again.",
-});
-
-export const forgotPasswordRateLimiter = createRateLimiter({
-  keyPrefix: "forgot-password",
-  windowMs: 15 * 60 * 1000,
-  maxRequests: 3,
-  message: "Too many password reset attempts. Please wait before trying again.",
-});
-
-export const resetPasswordRateLimiter = createRateLimiter({
-  keyPrefix: "reset-password",
-  windowMs: 15 * 60 * 1000,
-  maxRequests: 5,
-  message: "Too many password reset attempts. Please wait before trying again.",
-});
-
-export const otpVerificationRateLimiter = createRateLimiter({
-  keyPrefix: "otp-verification",
-  windowMs: 10 * 60 * 1000,
-  maxRequests: 5,
-  message: "Too many verification attempts. Please wait before trying again.",
-});
-
-export const protectedApiRateLimiter = createRateLimiter({
-  keyPrefix: "protected-api",
-  windowMs: 60 * 1000,
-  maxRequests: 20,
-  message: "Too many requests. Please wait before sending more messages.",
-});
-
-export const aiRouteRateLimiter = createRateLimiter({
-  keyPrefix: "ai",
-  windowMs: 60 * 1000,
-  maxRequests: 8,
-  message: "Too many AI requests. Please wait before trying again.",
-});
