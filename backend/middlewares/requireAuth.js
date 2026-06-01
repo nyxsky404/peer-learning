@@ -1,21 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
 import { HttpError } from "../utils/httpError.js";
-
-let supabaseInstance = null;
-
-const getSupabaseAdmin = () => {
-  if (supabaseInstance) return supabaseInstance;
-
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
-    return null;
-  }
-
-  supabaseInstance = createClient(supabaseUrl, supabaseKey);
-  return supabaseInstance;
-};
+import { getSupabaseAdmin } from "../utils/supabase.js";
 
 /**
  * Express middleware that validates a Supabase JWT from the Authorization header.
