@@ -81,8 +81,9 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     )
   } catch (error) {
+    console.error('ai-chat error:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: 'An unexpected error occurred. Please try again.' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     )
   }
