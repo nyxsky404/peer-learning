@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,6 +8,7 @@ import { toast } from 'sonner';
 export default function StudyRooms() {
   const { user } = useAuth();
   const navigate = useNavigate();
+
   const [rooms, setRooms] = useState<any[]>([]);
   const [newTopic, setNewTopic] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
@@ -18,9 +20,13 @@ export default function StudyRooms() {
 
     const channel = supabase
       .channel('study-rooms-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'study_rooms' }, () => {
-        fetchRooms();
-      })
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'study_rooms' },
+        () => {
+          fetchRooms();
+        }
+      )
       .subscribe();
 
     return () => {
@@ -43,26 +49,36 @@ export default function StudyRooms() {
     if (!newTopic.trim() || !user) return;
 
     setLoading(true);
+
     const { error } = await supabase
       .from('study_rooms' as any)
-      .insert([{ topic: newTopic, created_by: user.id, is_private: isPrivate }]);
+      .insert([
+        {
+          topic: newTopic,
+          created_by: user.id,
+          is_private: isPrivate,
+        },
+      ]);
 
     if (!error) {
       setNewTopic('');
+      setIsPrivate(false);
     } else {
       console.error('Error creating room:', error);
       toast.error('Failed to create room.');
     }
+
     setLoading(false);
   };
 
   /**
-   * Join a public room: calls the join_public_study_room RPC to register the
-   * user as a participant (idempotent), then navigates into the room.
-   * Private rooms are invite-only — the UI hides the Join button for them.
+   * Join a public room using the RPC.
+   * Private rooms are accessible only to their creator
+   * or users explicitly invited.
    */
   const handleJoinRoom = async (room: any) => {
     if (!user) return;
+
     setJoiningRoomId(room.id);
 
     const { error } = await supabase.rpc('join_public_study_room', {
@@ -83,15 +99,17 @@ export default function StudyRooms() {
   return (
     <div className="min-h-screen bg-[#0B1120] text-white p-6 md:p-12">
       <div className="max-w-4xl mx-auto space-y-8">
-
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Study Rooms</h1>
-          <p className="text-gray-400 mt-2">Create or join a topic-based room to learn with peers.</p>
+          <p className="text-gray-400 mt-2">
+            Create or join a topic-based room to learn with peers.
+          </p>
         </div>
 
         {/* Create Room Section */}
         <div className="p-6 bg-slate-900 border border-slate-800 rounded-xl shadow-sm">
           <h2 className="text-xl font-semibold mb-4">Create a New Room</h2>
+
           <div className="flex gap-3">
             <input
               type="text"
@@ -101,6 +119,7 @@ export default function StudyRooms() {
               className="flex-1 bg-slate-950 border border-slate-800 text-white p-3 rounded-lg focus:outline-none focus:border-blue-500 transition"
               onKeyDown={(e) => e.key === 'Enter' && handleCreateRoom()}
             />
+
             <label className="flex items-center gap-2 text-sm text-slate-300">
               <input
                 type="checkbox"
@@ -110,6 +129,7 @@ export default function StudyRooms() {
               />
               Private Room
             </label>
+
             <button
               onClick={handleCreateRoom}
               disabled={loading || !newTopic.trim()}
@@ -120,9 +140,10 @@ export default function StudyRooms() {
           </div>
         </div>
 
-        {/* List Rooms Section */}
+        {/* Rooms List */}
         <div>
           <h2 className="text-xl font-semibold mb-4">Available Rooms</h2>
+
           <div className="grid gap-4 md:grid-cols-2">
             {rooms.length === 0 ? (
               <p className="text-gray-500 col-span-2 bg-slate-900 p-8 rounded-xl text-center border border-slate-800 border-dashed">
@@ -132,8 +153,6 @@ export default function StudyRooms() {
               rooms.map((room) => {
                 const isJoining = joiningRoomId === room.id;
                 const isOwner = user?.id === room.created_by;
-                // Private rooms can only be entered by the creator or invited members.
-                // Non-owners see a lock badge — the Join button is hidden.
                 const canJoin = !room.is_private || isOwner;
 
                 return (
@@ -146,14 +165,17 @@ export default function StudyRooms() {
                         <h3 className="font-medium text-lg text-white group-hover:text-blue-400 transition">
                           {room.topic}
                         </h3>
+
                         {room.is_private && (
                           <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20">
                             Private
                           </span>
                         )}
                       </div>
+
                       <p className="text-sm text-slate-500 mt-1">
-                        Created {new Date(room.created_at).toLocaleDateString()}
+                        Created{' '}
+                        {new Date(room.created_at).toLocaleDateString()}
                       </p>
                     </div>
 
@@ -176,9 +198,7 @@ export default function StudyRooms() {
             )}
           </div>
         </div>
-
       </div>
     </div>
   );
 }
-

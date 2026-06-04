@@ -95,7 +95,7 @@ export function Hero({ streak }: HeroProps) {
         <motion.div
           animate={{ y: [0, -10, 0] }}
           transition={{ duration: 4, repeat: Infinity }}
-          className="absolute -left-8 top-10 rounded-3xl border border-white/10 bg-white/10 p-5 backdrop-blur-2xl"
+          className="absolute -left-16 top-32 z-0 rounded-3xl border border-white/10 bg-white/10 p-5 backdrop-blur-2xl md:top-36"
         >
           <div className="flex items-center gap-3">
             <Flame className="text-cyan-400" />
@@ -111,7 +111,7 @@ export function Hero({ streak }: HeroProps) {
         <motion.div
           animate={{ y: [0, 12, 0] }}
           transition={{ duration: 5, repeat: Infinity }}
-          className="absolute bottom-10 right-0 rounded-3xl border border-white/10 bg-white/10 p-5 backdrop-blur-2xl"
+          className="absolute -bottom-10 right-0 z-20 rounded-3xl border border-white/10 bg-white/10 p-5 backdrop-blur-2xl md:-bottom-8"
         >
           <div className="flex items-center gap-3">
             <Brain className="text-cyan-400" />

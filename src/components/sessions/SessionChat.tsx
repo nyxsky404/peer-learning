@@ -1,5 +1,7 @@
 import { useRef, useState, useEffect } from "react";
 import { Send, Video, Sparkles } from "lucide-react";
+import { LiveCodeRunner } from "@/components/studyroom/LiveCodeRunner";
+import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 
 type SessionChatProps = {
   selectedSession: any;
@@ -148,7 +150,7 @@ export function SessionChat({
                       <p className="text-xs text-cyan-300 mb-1">{msg.username}</p>
                     )}
 
-                    <p>{msg.message}</p>
+                    <MarkdownRenderer content={msg.message} />
 
                     <p className="text-[10px] opacity-70 mt-2">
                       {new Date(msg.created_at).toLocaleTimeString([], {
@@ -201,6 +203,15 @@ export function SessionChat({
 
           {/* INPUT */}
           <div className="pt-4 border-t border-white/10 flex gap-3">
+            <LiveCodeRunner 
+              onShare={(code, lang, output) => {
+                let formattedMessage = `\`\`\`${lang}\n${code}\n\`\`\``;
+                if (output) {
+                  formattedMessage += `\n**Output:**\n\`\`\`text\n${output}\n\`\`\``;
+                }
+                sendMessage(formattedMessage);
+              }}
+            />
             <input
               type="text"
               placeholder="Type a message..."
