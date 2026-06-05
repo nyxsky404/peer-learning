@@ -2,6 +2,7 @@ import express from "express";
 import { randomUUID } from "crypto";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import rateLimit from "express-rate-limit";
 import chatRoutes from "./routers/chatRoutes.js";
 import aiRoutes from "./routers/aiRoutes.js";
 import matchRoutes from "./routers/matchRoutes.js";
@@ -13,9 +14,6 @@ import { errorHandler } from "./middlewares/errorHandler.js";
 const app = express();
 
 // SECURITY: Only trust proxy headers when explicitly configured.
-// Set TRUST_PROXY=true for simple single-hop proxies (e.g., Heroku, Render).
-// Set TRUSTED_PROXIES="10.0.0.0/8,172.16.0.0/12" for explicit subnet whitelisting (recommended).
-// When neither is set, req.ip always returns the raw socket address, preventing X-Forwarded-For spoofing.
 if (process.env.TRUSTED_PROXIES) {
   app.set("trust proxy", process.env.TRUSTED_PROXIES.split(",").map(s => s.trim()));
   console.log(`[security] trust proxy enabled for subnets: ${process.env.TRUSTED_PROXIES}`);
@@ -24,10 +22,6 @@ if (process.env.TRUSTED_PROXIES) {
   console.warn("[security] trust proxy enabled with hop-count 1. Consider setting TRUSTED_PROXIES for explicit subnet whitelisting.");
 }
 
-// SECURITY: Build a strict CORS origin whitelist.
-// - FRONTEND_URL can be a single URL or comma-separated list (e.g., "https://app.example.com,https://staging.example.com").
-// - In production, the server refuses to start if FRONTEND_URL is missing.
-// - In development, it defaults to common localhost origins for convenience.
 const ALLOWED_ORIGINS = process.env.FRONTEND_URL;
 
 if (!ALLOWED_ORIGINS) {
@@ -41,8 +35,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
-// Cap incoming JSON body size to 100 KB so a single oversized request
-// cannot exhaust server memory or cause a denial-of-service condition.
+
 app.use(express.json({ limit: "100kb" }));
 app.use(cookieParser());
 app.use((req, res, next) => {
@@ -54,6 +47,25 @@ app.use((req, res, next) => {
 app.get("/health", (_req, res) => {
   res.status(200).json({ ok: true });
 });
+
+// General API rate limiter
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 150, // limit each IP to 150 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Stricter rate limiter for AI to prevent OPENROUTER_API_KEY exhaustion
+const aiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // limit each IP to 20 AI requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use("/api", apiLimiter);
+app.use("/api/ai", aiLimiter);
 
 app.use("/api/ai", aiRoutes);
 app.use("/api/auth", authRoutes);
