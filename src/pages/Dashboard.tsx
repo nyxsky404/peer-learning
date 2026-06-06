@@ -142,18 +142,29 @@ const Dashboard = () => {
 
   const handleConnect = async (peerId: string) => {
     if (!user || connectedPeerIds.has(peerId)) return;
+    // Optimistic update prevents duplicate inserts from double-clicks
+    setConnectedPeerIds((prev) => new Set([...prev, peerId]));
     const { error } = await (supabase as any).from("peer_connections").insert({
       sender_id: user.id,
       receiver_id: peerId,
       status: "pending",
     });
-    if (!error) {
-      setConnectedPeerIds((prev) => new Set([...prev, peerId]));
-      await (supabase as any).from("notifications").insert({
-        user_id: peerId,
-        type: "connection_request",
-        body: `${profile?.name || "Someone"} wants to connect with you!`,
+    if (error) {
+      // Roll back optimistic update on failure
+      setConnectedPeerIds((prev) => {
+        const next = new Set(prev);
+        next.delete(peerId);
+        return next;
       });
+      return;
+    }
+    const { error: notifError } = await (supabase as any).from("notifications").insert({
+      user_id: peerId,
+      type: "connection_request",
+      body: `${profile?.name || "Someone"} wants to connect with you!`,
+    });
+    if (notifError) {
+      console.error("Failed to send connection notification:", notifError);
     }
   };
 
