@@ -63,6 +63,7 @@ const Dashboard = () => {
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [recommendedPeers, setRecommendedPeers] = useState<any[]>([]);
+  const [connectedPeerIds, setConnectedPeerIds] = useState<Set<string>>(new Set());
   const [upcomingSessions, setUpcomingSessions] = useState<any[]>([]);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
 
@@ -136,6 +137,23 @@ const Dashboard = () => {
       }
     } catch (err) {
       console.error("Failed to fetch recommended peers:", err);
+    }
+  };
+
+  const handleConnect = async (peerId: string) => {
+    if (!user || connectedPeerIds.has(peerId)) return;
+    const { error } = await (supabase as any).from("peer_connections").insert({
+      sender_id: user.id,
+      receiver_id: peerId,
+      status: "pending",
+    });
+    if (!error) {
+      setConnectedPeerIds((prev) => new Set([...prev, peerId]));
+      await (supabase as any).from("notifications").insert({
+        user_id: peerId,
+        type: "connection_request",
+        body: `${profile?.name || "Someone"} wants to connect with you!`,
+      });
     }
   };
 
@@ -435,10 +453,11 @@ const Dashboard = () => {
                       </div>
 
                       <button
-                        onClick={() => navigate("/discover")}
-                        className="mt-5 w-full rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 px-4 py-3 font-semibold text-slate-900 transition hover:scale-[1.02]"
+                        onClick={() => handleConnect(p.id)}
+                        disabled={connectedPeerIds.has(p.id)}
+                        className="mt-5 w-full rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 px-4 py-3 font-semibold text-slate-900 transition hover:scale-[1.02] disabled:opacity-60 disabled:cursor-not-allowed"
                       >
-                        Connect with Peer
+                        {connectedPeerIds.has(p.id) ? "Pending" : "Connect with Peer"}
                       </button>
                     </div>
                 ))}
