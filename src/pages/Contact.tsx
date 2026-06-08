@@ -27,10 +27,10 @@ type ContactFormData = {
 
 type FormErrors = Partial<Record<keyof ContactFormData, string>>;
 
-// --- FIX: Rate limit constants ---
-const RATE_LIMIT_MAX = 3;          // max submissions
-const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes in ms
-const COOLDOWN_MS = 60 * 1000;     // 1 minute cooldown between submissions
+// --- Rate limit constants (must mirror the DB-level policy values) ---
+const RATE_LIMIT_MAX = 3;
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+const COOLDOWN_MS = 60 * 1000;               // 1 minute between submissions
 const STORAGE_KEY = "contact_submissions";
 
 type SubmissionRecord = {
@@ -38,7 +38,6 @@ type SubmissionRecord = {
   lastMessage: string;
 };
 
-// --- FIX: Read/write submission history from localStorage ---
 const getSubmissionRecord = (): SubmissionRecord => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -53,27 +52,27 @@ const saveSubmissionRecord = (record: SubmissionRecord) => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(record));
 };
 
-// --- FIX: Check if rate limit is exceeded ---
-const checkRateLimit = (message: string): { allowed: boolean; reason?: string } => {
+const checkRateLimit = (
+  message: string
+): { allowed: boolean; reason?: string } => {
   const now = Date.now();
   const record = getSubmissionRecord();
 
-  // Remove timestamps outside the window
   const recentTimestamps = record.timestamps.filter(
     (t) => now - t < RATE_LIMIT_WINDOW_MS
   );
 
-  // Block if too many submissions in window
   if (recentTimestamps.length >= RATE_LIMIT_MAX) {
     const oldest = Math.min(...recentTimestamps);
-    const resetInMin = Math.ceil((RATE_LIMIT_WINDOW_MS - (now - oldest)) / 60000);
+    const resetInMin = Math.ceil(
+      (RATE_LIMIT_WINDOW_MS - (now - oldest)) / 60000
+    );
     return {
       allowed: false,
       reason: `Too many messages sent. Please wait ${resetInMin} minute${resetInMin !== 1 ? "s" : ""} before trying again.`,
     };
   }
 
-  // Block if last submission was too recent (cooldown)
   if (recentTimestamps.length > 0) {
     const lastSubmission = Math.max(...recentTimestamps);
     const cooldownRemaining = COOLDOWN_MS - (now - lastSubmission);
@@ -86,7 +85,6 @@ const checkRateLimit = (message: string): { allowed: boolean; reason?: string } 
     }
   }
 
-  // Block duplicate message content
   if (
     record.lastMessage &&
     record.lastMessage.trim().toLowerCase() === message.trim().toLowerCase()
@@ -112,6 +110,29 @@ const recordSubmission = (message: string) => {
   });
 };
 
+// FIX: Phrases that Supabase/PostgreSQL actually returns for RLS violations.
+// Supabase does NOT return "rate limit" — it returns RLS policy error text.
+// We map all of these to a clear, user-friendly message.
+const RLS_ERROR_PHRASES = [
+  "violates row-level security policy",
+  "new row violates",
+  "row-level security",
+  "check constraint",
+] as const;
+
+function parseSupabaseError(errorMessage: string): string {
+  const lower = errorMessage.toLowerCase();
+
+  if (RLS_ERROR_PHRASES.some((phrase) => lower.includes(phrase))) {
+    // The DB-level policy blocked this — could be rate limit or duplicate.
+    // Give the user an accurate, actionable message.
+    return "You've submitted too many messages recently, or sent a duplicate message. Please wait a few minutes before trying again.";
+  }
+
+  // Fallback for unexpected errors
+  return errorMessage || "An unexpected error occurred. Please try again.";
+}
+
 export default function Contact() {
   const { toast } = useToast();
   const [formData, setFormData] = useState<ContactFormData>({
@@ -126,14 +147,16 @@ export default function Contact() {
 
   const validate = () => {
     const newErrors: FormErrors = {};
-    if (!formData.first_name.trim()) newErrors.first_name = "First name is required";
-    if (!formData.last_name.trim()) newErrors.last_name = "Last name is required";
+    if (!formData.first_name.trim())
+      newErrors.first_name = "First name is required";
+    if (!formData.last_name.trim())
+      newErrors.last_name = "Last name is required";
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!formData.email.trim()) {
       newErrors.email = "Email is required";
     } else if (!emailRegex.test(formData.email)) {
-      newErrors.email = "Invalid email address";
+      newErrors.email = "Please enter a valid email address";
     }
 
     if (!formData.subject.trim()) newErrors.subject = "Subject is required";
@@ -155,7 +178,7 @@ export default function Contact() {
       return;
     }
 
-    // --- FIX: Check client-side rate limit before hitting the DB ---
+    // Client-side rate limit check (fast, no DB round-trip needed)
     const rateLimitCheck = checkRateLimit(formData.message);
     if (!rateLimitCheck.allowed) {
       toast({
@@ -169,30 +192,32 @@ export default function Contact() {
     setIsSubmitting(true);
 
     try {
-      const { error } = await (supabase as any).from("contact_messages").insert([
-        {
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          email: formData.email,
-          subject: formData.subject,
-          message: formData.message,
-        },
-      ]);
+      const { error } = await (supabase as any)
+        .from("contact_messages")
+        .insert([
+          {
+            first_name: formData.first_name,
+            last_name: formData.last_name,
+            email: formData.email,
+            subject: formData.subject,
+            message: formData.message,
+          },
+        ]);
 
       if (error) {
-        // --- FIX: Surface DB-level rate limit errors clearly ---
-        if (error.message?.toLowerCase().includes("rate limit")) {
-          throw new Error("Too many messages from this email. Please try again later.");
-        }
-        throw new Error(error.message || "Failed to send message");
+        // FIX: Use parseSupabaseError instead of checking for "rate limit".
+        // Supabase RLS violations never contain the phrase "rate limit" —
+        // they contain "violates row-level security policy" and similar.
+        throw new Error(parseSupabaseError(error.message));
       }
 
-      // --- FIX: Record the submission for future rate limit checks ---
+      // Record locally so future submissions are caught client-side first
       recordSubmission(formData.message);
 
       toast({
         title: "Message Sent! 🎉",
-        description: "We've received your message and will get back to you shortly.",
+        description:
+          "We've received your message and will get back to you shortly.",
       });
 
       setFormData({
@@ -218,7 +243,9 @@ export default function Contact() {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { id, value } = e.target;
     setFormData((prev) => ({ ...prev, [id]: value }));
     if (errors[id as keyof ContactFormData]) {
@@ -354,7 +381,6 @@ export default function Contact() {
               Fill out the form below and our team will respond shortly.
             </p>
 
-            {/* --- FIX: Rate limit notice shown to user --- */}
             <p className="mt-2 text-xs text-slate-400">
               You can send up to {RATE_LIMIT_MAX} messages every 10 minutes.
             </p>
@@ -362,7 +388,10 @@ export default function Contact() {
             <form className="mt-10 space-y-6" onSubmit={handleSubmit}>
               <div className="grid gap-6 md:grid-cols-2">
                 <div>
-                  <label htmlFor="first_name" className="mb-2 block text-sm font-medium text-slate-300">
+                  <label
+                    htmlFor="first_name"
+                    className="mb-2 block text-sm font-medium text-slate-300"
+                  >
                     First Name
                   </label>
                   <Input
@@ -373,12 +402,17 @@ export default function Contact() {
                     className={`h-14 rounded-2xl border-white/10 bg-white/5 text-white placeholder:text-slate-500 focus-visible:ring-cyan-400 ${errors.first_name ? "border-red-400" : ""}`}
                   />
                   {errors.first_name && (
-                    <p className="mt-1 text-sm text-red-400">{errors.first_name}</p>
+                    <p className="mt-1 text-sm text-red-400">
+                      {errors.first_name}
+                    </p>
                   )}
                 </div>
 
                 <div>
-                  <label htmlFor="last_name" className="mb-2 block text-sm font-medium text-slate-300">
+                  <label
+                    htmlFor="last_name"
+                    className="mb-2 block text-sm font-medium text-slate-300"
+                  >
                     Last Name
                   </label>
                   <Input
@@ -389,13 +423,18 @@ export default function Contact() {
                     className={`h-14 rounded-2xl border-white/10 bg-white/5 text-white placeholder:text-slate-500 focus-visible:ring-cyan-400 ${errors.last_name ? "border-red-400" : ""}`}
                   />
                   {errors.last_name && (
-                    <p className="mt-1 text-sm text-red-400">{errors.last_name}</p>
+                    <p className="mt-1 text-sm text-red-400">
+                      {errors.last_name}
+                    </p>
                   )}
                 </div>
               </div>
 
               <div>
-                <label htmlFor="email" className="mb-2 block text-sm font-medium text-slate-300">
+                <label
+                  htmlFor="email"
+                  className="mb-2 block text-sm font-medium text-slate-300"
+                >
                   Email Address
                 </label>
                 <Input
@@ -412,7 +451,10 @@ export default function Contact() {
               </div>
 
               <div>
-                <label htmlFor="subject" className="mb-2 block text-sm font-medium text-slate-300">
+                <label
+                  htmlFor="subject"
+                  className="mb-2 block text-sm font-medium text-slate-300"
+                >
                   Subject
                 </label>
                 <Input
@@ -428,7 +470,10 @@ export default function Contact() {
               </div>
 
               <div>
-                <label htmlFor="message" className="mb-2 block text-sm font-medium text-slate-300">
+                <label
+                  htmlFor="message"
+                  className="mb-2 block text-sm font-medium text-slate-300"
+                >
                   Message
                 </label>
                 <Textarea
