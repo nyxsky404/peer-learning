@@ -1,4 +1,4 @@
-process.env.OPENROUTER_API_KEY = "dummy-test-key";
+process.env.OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "dummy-test-key";
 
 vi.mock("openai", () => {
   return {
