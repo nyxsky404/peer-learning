@@ -181,4 +181,35 @@ describe("dispatchPushNotifications — race condition", () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ sent: 0, processed: 0 });
   });
+
+  it("claimed notifications remain retryable after subscription fetch error", async () => {
+  // Inject a subscription-fetch failure on the first call
+  const supabaseMock = makeSupabaseMock();
+  const originalFrom = supabaseMock.from.bind(supabaseMock);
+
+  vi.spyOn(supabaseMock, "from").mockImplementationOnce((table) => {
+    if (table === "push_subscriptions") {
+      return {
+        select: () => ({
+          in: () => Promise.resolve({ data: null, error: { message: "DB error" } }),
+        }),
+      };
+    }
+    return originalFrom(table);
+  });
+
+  // First call: subscription fetch fails → should 500
+  const res1 = await request(app).post("/dispatch");
+  expect(res1.status).toBe(500);
+
+  // Rows should still be pending (push_sent_at not set)
+  const stillPending = dbRows.filter((r) => r.push_sent_at == null);
+  expect(stillPending.length).toBeGreaterThan(0);
+
+  // Second call: mock restored, stale claim timeout allows re-claim → should succeed
+  const res2 = await request(app).post("/dispatch");
+  expect(res2.status).toBe(200);
+  expect(res2.body.processed).toBeGreaterThan(0);
+  expect(res2.body.sent).toBeGreaterThan(0);
+});
 });

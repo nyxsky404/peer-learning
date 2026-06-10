@@ -33,12 +33,13 @@ export const dispatchPushNotifications = async (req, res, next) => {
     // SELECT … WHERE push_sent_at IS NULL pattern.
     // -------------------------------------------------------------------
     const claimedAt = new Date().toISOString();
+    const staleThreshold = new Date(Date.now() - 5 * 60 * 1000).toISOString();
 
     const { data: notifications, error: claimError } = await supabase
       .from("notifications")
       .update({ push_claimed_at: claimedAt })
       .is("push_sent_at", null)
-      .is("push_claimed_at", null)
+      .or(`push_claimed_at.is.null,push_claimed_at.lt.${staleThreshold}`)
       .select("id,user_id,title,body,action_url")
       .order("created_at", { ascending: true })
       .limit(100);
