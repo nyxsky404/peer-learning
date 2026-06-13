@@ -108,7 +108,8 @@ export function Communities() {
         designed around your goals.
       </p>
 
-      <div className="grid gap-7 md:grid-cols-2 xl:grid-cols-3 place-items-center xl:place-items-stretch">
+      <div className="grid gap-7 md:grid-cols-2 xl:grid-cols-3 justify-items-center xl:justify-items-stretch">
+        {" "}
         {communities.map((community, i) => {
           const Icon = community.icon;
           const isFeatured = community.isFeatured;
