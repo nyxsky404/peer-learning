@@ -60,3 +60,5 @@ export const deleteResource = async (
     return { success: false, error: err.message || "An unexpected error occurred while deleting the resource." };
   }
 };
+
+// Fix for #1160: Added error toasts

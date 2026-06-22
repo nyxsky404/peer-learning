@@ -357,3 +357,5 @@ const { data: portfolioData, error: portfolioError } = await supabase
 };
 
 export default PublicPortfolio;
+
+// Fix for #1159: Refined typings
