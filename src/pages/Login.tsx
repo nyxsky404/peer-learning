@@ -7,8 +7,6 @@ import googleIcon from "@/assets/google-icon.svg";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 
 import { useAuth } from "@/contexts/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -23,7 +21,6 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Errors>({});
 
@@ -267,18 +264,7 @@ const Login = () => {
               </p>
             )}
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  checked={rememberMe}
-                  onCheckedChange={(c) => setRememberMe(!!c)}
-                />
-
-                <Label className="text-slate-300">
-                  Remember me
-                </Label>
-              </div>
-
+            <div className="flex justify-end">
               <Link
                 to="/forgot-password"
                 className="text-sm text-cyan-400 hover:text-cyan-300"
