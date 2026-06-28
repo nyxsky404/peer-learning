@@ -176,7 +176,7 @@ The **Peer Learning Platform** solves this challenge by enabling students to con
 | **Forms & Validation** | React Hook Form, Zod |
 | **Charts & Data Visualization** | Chart.js, React Chart.js 2, Recharts |
 | **API Communication** | Axios |
-| **AI Integration** | OpenAI SDK |
+| **AI Integration** | OpenRouter API |
 | **Video Conferencing** | Jitsi React SDK |
 | **Testing** | Vitest, Playwright, Supertest, Testing Library |
 | **Code Quality** | ESLint |
