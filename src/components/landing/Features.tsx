@@ -1,4 +1,6 @@
-import { motion } from "framer-motion";
+import { useRef } from "react";
+import { motion, useInView } from "framer-motion";
+import { useCountUp } from "@/hooks/useCountUp";
 import {
   GraduationCap,
   Calendar,
@@ -48,32 +50,60 @@ const stats = [
   { value: "25K+", label: "Doubts Solved" },
 ];
 
+interface StatCardProps {
+  value: string;
+  label: string;
+  index: number;
+}
+
+function StatCard({ value, label, index }: StatCardProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(ref, { once: true, amount: 0.1 });
+
+  // Parse numeric value and suffix. E.g., "15K+" -> 15 and "K+"
+  const match = value.match(/^(\d+)(.*)$/);
+  const numericValue = match ? parseInt(match[1], 10) : 0;
+  const suffix = match ? match[2] : "";
+
+  const count = useCountUp(numericValue, 2000, isInView);
+
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 40 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.15 }}
+      viewport={{ once: true }}
+      whileHover={{ y: -8 }}
+      className="rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-2xl transition-all duration-300 hover:border-cyan-400/30 hover:shadow-[0_0_50px_rgba(34,211,238,0.2)]"
+    >
+      <h3 className="text-4xl font-black tabular-nums">
+        <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
+          {count}
+        </span>
+        <span className="text-cyan-400">{suffix}</span>
+      </h3>
+
+      <p className="mt-3 text-slate-300/70">{label}</p>
+    </motion.div>
+  );
+}
+
 export function Features() {
   return (
     <>
       {/* Stats */}
       <section id="stats" className="container mx-auto mt-20 grid grid-cols-2 gap-6 px-6 py-10 text-center md:grid-cols-4">
         {stats.map((s, i) => (
-          <motion.div
+          <StatCard
             key={i}
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.15 }}
-            viewport={{ once: true }}
-            whileHover={{ y: -8 }}
-            className="rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-2xl transition-all duration-300 hover:border-cyan-400/30 hover:shadow-[0_0_50px_rgba(34,211,238,0.2)]"
-          >
-            <h3 className="text-4xl font-black">
-              <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-                {s.value.replace("+", "")}
-              </span>
-              <span className="text-cyan-400">+</span>
-            </h3>
-
-            <p className="mt-3 text-slate-300/70">{s.label}</p>
-          </motion.div>
+            value={s.value}
+            label={s.label}
+            index={i}
+          />
         ))}
       </section>
+
 
       {/* How it Works */}
       <section className="container px-6 py-24 relative">
