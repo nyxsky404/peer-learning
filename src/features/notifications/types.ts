@@ -1,6 +1,8 @@
 export type NotificationType =
   | "message"
   | "session_reminder"
+  | "mentorship_reminder"
+  | "mentorship_reminder_overdue"
   | "announcement"
   | "system";
 
