@@ -103,8 +103,9 @@ export default function FocusTimer() {
     const newIsActive = !isActive;
     setIsActive(newIsActive);
     
-    if (!newIsActive && !isBreak) {
-      // Stopped manually during work
+    if (!newIsActive) {
+      // Reset manual stops to the next work session, even if the current mode is break.
+      setIsBreak(false);
       setTimeLeft(workDuration * 60);
     }
     
