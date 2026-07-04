@@ -412,7 +412,7 @@ CREATE POLICY "Users can insert push subscriptions"
   ON public.push_subscriptions FOR INSERT WITH CHECK (user_id = auth.uid());
 
 CREATE POLICY "Users can update own push subscriptions" 
-  ON public.push_subscriptions FOR UPDATE USING (user_id = auth.uid());
+  ON public.push_subscriptions FOR UPDATE USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
 
 CREATE POLICY "Users can delete own push subscriptions" 
   ON public.push_subscriptions FOR DELETE USING (user_id = auth.uid());
