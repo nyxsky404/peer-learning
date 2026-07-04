@@ -14,6 +14,13 @@ import { useResources } from "@/hooks/useResources";
 import type { Resource } from "@/types/resource";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
+const getResourceGridColumnCount = () => {
+  if (typeof window === "undefined") return 3;
+  if (window.matchMedia("(min-width: 1280px)").matches) return 3;
+  if (window.matchMedia("(min-width: 640px)").matches) return 2;
+  return 1;
+};
+
 const ResourceHub = () => {
   const auth = useContext(AuthContext);
   const currentUser = auth?.user ?? null;
@@ -25,6 +32,7 @@ const ResourceHub = () => {
   const [savedOnly, setSavedOnly] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
+  const [gridColumnCount, setGridColumnCount] = useState(getResourceGridColumnCount);
 
   // Debounce search to prevent network spam on every keystroke
   useEffect(() => {
@@ -52,12 +60,22 @@ const ResourceHub = () => {
   const gridRows = useMemo(() => {
     const rows: Resource[][] = [];
 
-    for (let index = 0; index < displayedResources.length; index += 3) {
-      rows.push(displayedResources.slice(index, index + 3));
+    for (let index = 0; index < displayedResources.length; index += gridColumnCount) {
+      rows.push(displayedResources.slice(index, index + gridColumnCount));
     }
 
     return rows;
-  }, [displayedResources]);
+  }, [displayedResources, gridColumnCount]);
+
+  useEffect(() => {
+    const updateColumnCount = () => {
+      setGridColumnCount(getResourceGridColumnCount());
+    };
+
+    updateColumnCount();
+    window.addEventListener("resize", updateColumnCount);
+    return () => window.removeEventListener("resize", updateColumnCount);
+  }, []);
 
   const rowsParentRef = useRef<HTMLDivElement | null>(null);
   const rowVirtualizer = useVirtualizer({
