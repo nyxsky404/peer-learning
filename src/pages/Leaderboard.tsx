@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/useAuth";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { logError } from "@/utils/logger";
+import { toast } from "sonner";
 
 import {
   calculateLevel,
@@ -108,99 +110,112 @@ const Leaderboard = () => {
   const [myRank, setMyRank] = useState<number>(0);
   const [myEntry, setMyEntry] = useState<LeaderboardEntry | null>(null);
   const [totalLearners, setTotalLearners] = useState<number>(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const listParentRef = useRef<HTMLDivElement | null>(null);
 
   // FETCH LEADERBOARD
   const fetchLeaderboard = useCallback(async () => {
 
     setLoading(true);
+    setLoadError(null);
 
-    let query = supabase
-      .from("leaderboard" as any)
-      .select("*");
+    try {
+      let query = supabase
+        .from("leaderboard" as any)
+        .select("*");
 
-    if (filter === "Weekly") {
+      if (filter === "Weekly") {
 
-      const lastWeek = new Date();
+        const lastWeek = new Date();
 
-      lastWeek.setDate(lastWeek.getDate() - 7);
+        lastWeek.setDate(lastWeek.getDate() - 7);
 
-      query = query.gte(
-        "updated_at",
-        lastWeek.toISOString()
-      );
-    }
+        query = query.gte(
+          "updated_at",
+          lastWeek.toISOString()
+        );
+      }
 
-    if (filter === "Monthly") {
+      if (filter === "Monthly") {
 
-      const lastMonth = new Date();
+        const lastMonth = new Date();
 
-      lastMonth.setMonth(lastMonth.getMonth() - 1);
+        lastMonth.setMonth(lastMonth.getMonth() - 1);
 
-      query = query.gte(
-        "updated_at",
-        lastMonth.toISOString()
-      );
-    }
+        query = query.gte(
+          "updated_at",
+          lastMonth.toISOString()
+        );
+      }
 
-    const { data, error } = await query
-      .order("xp", { ascending: false })
-      .limit(50);
+      const { data, error } = await query
+        .order("xp", { ascending: false })
+        .limit(50);
 
-    if (!error && data) {
+      if (error) throw error;
 
-      const updatedData = data.map((entry: any) => ({
-        ...entry,
-        badges:
-          entry.badges && entry.badges.length > 0
-            ? entry.badges
-            : [getBadgeByXP(entry.xp)],
-      }));
+      const updatedData = (data ?? []).map((entry: any) => ({
+          ...entry,
+          badges:
+            entry.badges && entry.badges.length > 0
+              ? entry.badges
+              : [getBadgeByXP(entry.xp)],
+        }));
 
       setEntries(updatedData as LeaderboardEntry[]);
-    }
 
-    // Fetch total learner count efficiently (head-only count)
-    const { count } = await supabase
-      .from("leaderboard" as any)
-      .select("*", { count: "exact", head: true });
-
-    setTotalLearners(count || 0);
-
-    // Fetch current user's rank separately so it's always accurate
-    if (user) {
-      // Get the current user's entry
-      const { data: myData } = await supabase
+      // Fetch total learner count efficiently (head-only count)
+      const { count, error: countError } = await supabase
         .from("leaderboard" as any)
-        .select("*")
-        .eq("user_id", user.id)
-        .single();
+        .select("*", { count: "exact", head: true });
 
-      if (myData) {
-        const enrichedEntry = {
-          ...(myData as Record<string, any>),
-          badges:
-            (myData as any).badges && (myData as any).badges.length > 0
-              ? (myData as any).badges
-              : [getBadgeByXP((myData as any).xp)],
-        } as LeaderboardEntry;
+      if (countError) throw countError;
 
-        setMyEntry(enrichedEntry);
+      setTotalLearners(count || 0);
 
-        // Fetch user's exact rank via RPC to avoid pulling data
-        const { data: rpcRank } = await supabase.rpc("get_user_rank", {
-          p_user_id: user.id,
-          p_filter: filter,
-        });
+      // Fetch current user's rank separately so it's always accurate
+      if (user) {
+        // Get the current user's entry
+        const { data: myData, error: myError } = await supabase
+          .from("leaderboard" as any)
+          .select("*")
+          .eq("user_id", user.id)
+          .maybeSingle();
 
-        setMyRank(rpcRank || 0);
-      } else {
-        setMyEntry(null);
-        setMyRank(0);
+        if (myError) throw myError;
+
+        if (myData) {
+          const enrichedEntry = {
+            ...(myData as Record<string, any>),
+            badges:
+              (myData as any).badges && (myData as any).badges.length > 0
+                ? (myData as any).badges
+                : [getBadgeByXP((myData as any).xp)],
+          } as LeaderboardEntry;
+
+          setMyEntry(enrichedEntry);
+
+          // Fetch user's exact rank via RPC to avoid pulling data
+          const { data: rpcRank, error: rankError } = await supabase.rpc("get_user_rank", {
+            p_user_id: user.id,
+            p_filter: filter,
+          });
+
+          if (rankError) throw rankError;
+
+          setMyRank(rpcRank || 0);
+        } else {
+          setMyEntry(null);
+          setMyRank(0);
+        }
       }
+    } catch (error) {
+      logError(error, { context: "Leaderboard.fetchLeaderboard" });
+      setLoadError("Failed to load leaderboard data.");
+      toast.error("Failed to load leaderboard data.");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }, [filter, user]);
 
   // AUTO CREATE USER
@@ -333,6 +348,12 @@ const Leaderboard = () => {
           </p>
 
         </motion.div>
+
+        {loadError && (
+          <div className="mt-8 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+            {loadError}
+          </div>
+        )}
 
         {/* STATS */}
         <div className="mt-12 grid gap-5 md:grid-cols-4">
