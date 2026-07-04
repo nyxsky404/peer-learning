@@ -17,7 +17,7 @@ const AIPage = () => {
   const [loading, setLoading] = useState(false);
 
   const sendMessage = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || loading) return;
 
     const prompt = input;
 
@@ -132,6 +132,7 @@ const AIPage = () => {
             <button
               key={index}
               onClick={() => setInput(item)}
+              disabled={loading}
               className="bg-white/10 hover:bg-white/20 transition px-4 py-2 rounded-full whitespace-nowrap text-sm"
             >
               {item}
@@ -194,18 +195,20 @@ const AIPage = () => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") {
+              if (e.key === "Enter" && !loading) {
                 sendMessage();
               }
             }}
+            disabled={loading}
             placeholder="Ask AI to match you with peers..."
             className="flex-1 bg-white/10 rounded-2xl px-4 py-3 outline-none border border-white/10 focus:border-cyan-400 transition"
           />
 
           <button
             onClick={sendMessage}
+            disabled={loading || !input.trim()}
             aria-label="Send message"
-            className="bg-cyan-400 hover:bg-cyan-300 transition text-black p-4 rounded-2xl"
+            className="bg-cyan-400 hover:bg-cyan-300 disabled:opacity-50 transition text-black p-4 rounded-2xl"
           >
             <Send size={20} />
           </button>
