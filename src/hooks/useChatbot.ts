@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { API_BASE_URL } from "@/config/api";
+import { logError } from "@/utils/logger";
+import { toast } from "sonner";
 
 export type Message = {
   role: "user" | "assistant";
@@ -75,7 +77,18 @@ export function useChatbot() {
     setInput("");
     setLoading(true);
 
-    await (supabase as any).from("chat_messages").insert([userMsg as any]);
+    const { error: insertError } = await (supabase as any)
+      .from("chat_messages")
+      .insert([userMsg as any]);
+
+    if (insertError) {
+      logError(insertError, { context: "useChatbot.saveUserMessage" });
+      toast.error("Failed to save message. Please try again.");
+      setMessages(messages);
+      setInput(userMsg.text);
+      setLoading(false);
+      return;
+    }
 
     try {
       const formattedMessages = updatedMessages.map((msg) => ({
@@ -127,7 +140,8 @@ export function useChatbot() {
 
       await (supabase as any).from("chat_messages").insert([botMsg as any]);
     } catch (err) {
-      console.error("Chatbot error:", err);
+      logError(err, { context: "useChatbot.sendMessage" });
+      toast.error("Failed to send message. Please try again.");
       const errorMsg: Message = { role: "assistant", text: "Something went wrong. Please try again.", user_id: userId };
       setMessages((prev) => [...prev, errorMsg]);
       await (supabase as any).from("chat_messages").insert([errorMsg as any]);
