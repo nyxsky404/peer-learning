@@ -63,12 +63,10 @@ export const useResources = (filters?: ResourceFilters) => {
           return;
         }
         
-        const { data: savedData, error: savedError } = await safeSupabaseCall(
+        const savedData = await safeSupabaseCall<SavedResource[]>(
           () => (supabase as any).from("saved_resources").select("resource_id").eq("user_id", user.id).abortSignal(controller.signal)
         );
-        
-        if (savedError) throw savedError;
-        
+
         savedResourceIds =
           (savedData as SavedResource[] | null)?.map(
             (item) => item.resource_id
