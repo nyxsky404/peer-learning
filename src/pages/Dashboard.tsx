@@ -220,7 +220,7 @@ const Dashboard = () => {
     }
     const { error: notifError } = await (supabase as any).from("notifications").insert({
       user_id: peerId,
-      type: "connection_request",
+      type: "system",
       body: `${profile?.name || "Someone"} wants to connect with you!`,
     });
     if (notifError) {
