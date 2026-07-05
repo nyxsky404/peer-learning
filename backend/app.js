@@ -66,6 +66,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+// AI routes use a tighter body limit; mount before the global parser so it applies.
+app.use("/api/ai", express.json({ limit: "50kb" }));
 app.use(express.json({ limit: "100kb" }));
 app.use(cookieParser());
 app.use((req, res, next) => {

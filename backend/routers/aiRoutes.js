@@ -15,13 +15,9 @@ import { aiSchemas } from "../validation/schemas.js";
 
 const router = express.Router();
 
-// SECURITY: Tighter body limit for AI routes (50KB) since these endpoints
-// have well-defined, smaller input requirements than the global 100KB cap.
-const aiBodyLimit = express.json({ limit: "50kb" });
-
-router.post("/ask", aiBodyLimit, requireAuth, rateLimiter, validate(aiSchemas.askAI), asyncHandler(askAI));
-router.post("/generate-summary", aiBodyLimit, requireAuth, rateLimiter, validate(aiSchemas.generateSessionSummary), asyncHandler(generateSessionSummary));
-router.post("/mock-interview/chat", aiBodyLimit, requireAuth, rateLimiter, validate(aiSchemas.mockInterviewChat), asyncHandler(conductMockInterview));
-router.post("/mock-interview/report", aiBodyLimit, requireAuth, rateLimiter, validate(aiSchemas.mockInterviewReport), asyncHandler(generateMockInterviewReport));
+router.post("/ask", requireAuth, rateLimiter, validate(aiSchemas.askAI), asyncHandler(askAI));
+router.post("/generate-summary", requireAuth, rateLimiter, validate(aiSchemas.generateSessionSummary), asyncHandler(generateSessionSummary));
+router.post("/mock-interview/chat", requireAuth, rateLimiter, validate(aiSchemas.mockInterviewChat), asyncHandler(conductMockInterview));
+router.post("/mock-interview/report", requireAuth, rateLimiter, validate(aiSchemas.mockInterviewReport), asyncHandler(generateMockInterviewReport));
 
 export default router;
