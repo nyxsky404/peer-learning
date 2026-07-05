@@ -1,10 +1,11 @@
 import { z } from "zod";
 
 import { HttpError } from "../utils/httpError.js";
+import { ALLOWED_AI_MODELS } from "../utils/constants.js";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_MODEL = "openai/gpt-4o-mini";
-const ALLOWED_MODELS = ["openai/gpt-4o-mini", "openai/gpt-4o", "openai/gpt-4"];
+const ALLOWED_MODELS = ALLOWED_AI_MODELS;
 
 const ASK_AI_MAX_TOKENS = 512;
 const SUMMARY_MAX_TOKENS = 400;

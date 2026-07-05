@@ -1,6 +1,8 @@
 import { z } from "zod";
 
-const allowedChatModels = ["openai/gpt-3.5-turbo", "openai/gpt-4o-mini"];
+import { ALLOWED_AI_MODELS } from "../utils/constants.js";
+
+const allowedChatModels = ALLOWED_AI_MODELS;
 const MAX_ASK_MESSAGES = 10;
 const MAX_SUMMARY_MESSAGES = 50;
 
@@ -47,7 +49,7 @@ export const chatSchemas = {
     body: z
       .object({
         messages: z.array(chatMessageSchema).min(1).max(50),
-        model: z.enum(allowedChatModels).default("openai/gpt-3.5-turbo"),
+        model: z.enum(allowedChatModels).default("openai/gpt-4o-mini"),
         max_tokens: z.number().int().positive().max(512).optional(),
         temperature: z.number().min(0).max(2).default(0.7),
       })
