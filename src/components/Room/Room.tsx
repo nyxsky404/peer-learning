@@ -10,6 +10,9 @@ import { useRoomChat } from "@/hooks/useRoomChat";
 import { useRoomPresence } from "@/hooks/useRoomPresence";
 import { ChatBox } from "./ChatBox";
 import { InviteMenu } from "./InviteMenu";
+import { Video } from "lucide-react";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
+import { JitsiMeetingComponent } from "./JitsiMeetingComponent";
 
 const Whiteboard = React.lazy(() => import("@/components/Whiteboard/Whiteboard"));
 
@@ -18,6 +21,7 @@ export default function Room() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { room } = useRoomDetails(id, user);
+  const [isVideoActive, setIsVideoActive] = React.useState(false);
 
   // We need a ref for setActivities to pass to useRoomPresence since it's initialized after
   const [activities, setActivities] = React.useState<string[]>([]);
@@ -57,6 +61,17 @@ export default function Room() {
             </div>
           </div>
           <div className="flex gap-3">
+            <button
+              onClick={() => setIsVideoActive(!isVideoActive)}
+              className={`text-sm font-medium px-4 py-2.5 rounded-lg transition flex items-center gap-2 ${
+                isVideoActive
+                  ? "bg-amber-500/10 text-amber-500 hover:bg-amber-500/20"
+                  : "bg-green-600/10 text-green-500 hover:bg-green-600/20"
+              }`}
+            >
+              <Video size={18} />
+              {isVideoActive ? "Close Video" : "Join Video Call"}
+            </button>
             {room.is_private && room.created_by === user?.id && (
               <InviteMenu roomId={id!} />
             )}
@@ -77,15 +92,30 @@ export default function Room() {
             onSendMessage={onSendMessage}
           />
 
-          {/* Whiteboard */}
-          <div className="flex-1 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
-            <Suspense
-              fallback={
-                <div className="h-full w-full animate-pulse bg-slate-800" />
-              }
-            >
-              <Whiteboard roomId={id!} />
-            </Suspense>
+          {/* Whiteboard and Video */}
+          <div className="flex-1 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg flex">
+            {isVideoActive ? (
+              <ResizablePanelGroup direction="vertical">
+                <ResizablePanel defaultSize={50} minSize={20}>
+                  <JitsiMeetingComponent
+                    roomName={`PeerLearning-Room-${id}`}
+                    userName={user?.user_metadata?.full_name || user?.email || "Anonymous Student"}
+                    userEmail={user?.email}
+                    onReadyToClose={() => setIsVideoActive(false)}
+                  />
+                </ResizablePanel>
+                <ResizableHandle withHandle />
+                <ResizablePanel defaultSize={50} minSize={20}>
+                  <Suspense fallback={<div className="h-full w-full animate-pulse bg-slate-800" />}>
+                    <Whiteboard roomId={id!} />
+                  </Suspense>
+                </ResizablePanel>
+              </ResizablePanelGroup>
+            ) : (
+              <Suspense fallback={<div className="h-full w-full animate-pulse bg-slate-800" />}>
+                <Whiteboard roomId={id!} />
+              </Suspense>
+            )}
           </div>
 
           <div className="w-72 hidden xl:flex flex-col gap-4">
