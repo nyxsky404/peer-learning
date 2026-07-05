@@ -1,11 +1,12 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { User } from "@supabase/supabase-js";
-import { Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/features/notifications/NotificationBell";
 import FocusTimer from "@/components/FocusTimer";
 import { getNavLinks } from "./navLinks";
+import { ThemeToggle } from "./ThemeToggle";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface MobileNavProps {
   user: User | null;
@@ -21,6 +22,7 @@ export const MobileNav = React.memo(function MobileNav({
   handleLogout,
 }: MobileNavProps) {
   const navLinks = getNavLinks(user, isAdmin);
+  const { setTheme } = useTheme();
 
   return (
     <div className="border-t border-white/10 bg-[#050816] px-6 py-5 md:hidden">
@@ -46,10 +48,7 @@ export const MobileNav = React.memo(function MobileNav({
 
         <div className="flex items-center justify-between rounded-xl bg-white/5 px-4 py-3">
           <span className="text-sm font-medium text-gray-300">Theme</span>
-          <div className="flex items-center gap-2 text-cyan-400 text-sm">
-            <Moon size={16} />
-            <span>Dark</span>
-          </div>
+          <ThemeToggle setTheme={setTheme} />
         </div>
 
         {user ? (
