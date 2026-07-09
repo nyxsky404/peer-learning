@@ -398,7 +398,7 @@ const Chat = () => {
         isTyping,
       },
     });
-  }, []);
+  }, [currentUser?.id, selectedUser?.id]);
 
   const handleMessageChange = useCallback((value: string) => {
     setMessageText(value);
