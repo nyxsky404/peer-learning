@@ -270,7 +270,7 @@ export function useMessages(
       setError(null);
 
       try {
-        const { data, error: rpcError } = await supabase.rpc("get_conversation_summaries", {
+        const { data, error: rpcError } = await (supabase as any).rpc("get_conversation_summaries", {
           p_user_id: currentUserId,
         });
 
@@ -325,4 +325,312 @@ export function useMessages(
 
               if (index === -1) {
                 const newProfiles = [...prev, updated];
-                newProfiles.sort((a, b) =>
+                newProfiles.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+                return newProfiles;
+              }
+
+              const newProfiles = [...prev];
+              newProfiles[index] = { ...newProfiles[index], ...updated };
+              return newProfiles;
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(profilesChannel);
+    };
+  }, [currentUserId]);
+
+  // Load initial thread messages when selectedUser changes
+  useEffect(() => {
+    if (!currentUserId || !selectedUser?.id) {
+      setThreadMessages([]);
+      setHasMoreThreadMessages(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadInitialThread = async () => {
+      setLoadingThreadMessages(true);
+      setError(null);
+
+      try {
+        const { data, error: queryError } = await supabase
+          .from("messages")
+          .select("id,sender_id,receiver_id,content,text,message,created_at,read_at")
+          .or(threadOrFilter(currentUserId, selectedUser.id))
+          .order("created_at", { ascending: false })
+          .limit(THREAD_PAGE_SIZE);
+
+        if (queryError) {
+          throw new Error(queryError.message);
+        }
+
+        if (!cancelled) {
+          const typedMessages = (data ?? []) as MessageRow[];
+          setThreadMessages(typedMessages.reverse());
+          setHasMoreThreadMessages(typedMessages.length === THREAD_PAGE_SIZE);
+        }
+      } catch (err: any) {
+        if (cancelled) return;
+        logError(err, { context: "useMessages.loadInitialThread" });
+        setError("Failed to load messages");
+        toast({
+          title: "Failed to load messages",
+          description: err.message || "An unexpected error occurred",
+          variant: "destructive",
+        });
+      } finally {
+        if (!cancelled) {
+          setLoadingThreadMessages(false);
+        }
+      }
+    };
+
+    loadInitialThread();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUserId, selectedUser?.id]);
+
+  const loadMoreThreadMessages = useCallback(async () => {
+    if (!currentUserId || !selectedUser?.id || loadingMoreThreadMessages || !hasMoreThreadMessages || threadMessages.length === 0) {
+      return;
+    }
+
+    setLoadingMoreThreadMessages(true);
+    const oldestTimestamp = threadMessages[0].created_at;
+
+    try {
+      const { data, error: queryError } = await supabase
+        .from("messages")
+        .select("id,sender_id,receiver_id,content,text,message,created_at,read_at")
+        .or(threadOrFilter(currentUserId, selectedUser.id))
+        .lt("created_at", oldestTimestamp)
+        .order("created_at", { ascending: false })
+        .limit(THREAD_PAGE_SIZE);
+
+      if (queryError) {
+        throw new Error(queryError.message);
+      }
+
+      if (data) {
+        const typedMessages = (data ?? []) as MessageRow[];
+        setThreadMessages((prev) => [...typedMessages.reverse(), ...prev]);
+        setHasMoreThreadMessages(typedMessages.length === THREAD_PAGE_SIZE);
+      }
+    } catch (err: any) {
+      logError(err, { context: "useMessages.loadMoreThreadMessages" });
+      toast({
+        title: "Failed to load earlier messages",
+        description: err.message || "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingMoreThreadMessages(false);
+    }
+  }, [currentUserId, selectedUser?.id, loadingMoreThreadMessages, hasMoreThreadMessages, threadMessages]);
+
+  // Manage online presence using Supabase Presence.
+  // This tracks which users are currently viewing the app and listens for incoming real-time messages.
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const presenceChannel = supabase.channel("messages-online-presence", {
+      config: {
+        presence: {
+          key: currentUserId,
+        },
+      },
+    });
+
+    presenceChannel
+      .on("presence", { event: "sync" }, () => {
+        setOnlineUserIds(Object.keys(presenceChannel.presenceState()));
+      })
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          await presenceChannel.track({
+            user_id: currentUserId,
+            online_at: new Date().toISOString(),
+          });
+        }
+      });
+
+    const channel = supabase
+      .channel("messages-inbox-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+        },
+        (payload) => {
+          const nextMessage = payload.new as MessageRow;
+
+          if (
+            nextMessage.sender_id !== currentUserId &&
+            nextMessage.receiver_id !== currentUserId
+          ) {
+            return;
+          }
+
+          const otherUserId =
+            nextMessage.sender_id === currentUserId
+              ? nextMessage.receiver_id
+              : nextMessage.sender_id;
+
+          if (otherUserId) {
+            const isCurrentThread = selectedUserIdRef.current === otherUserId;
+            upsertRawSummary(nextMessage, otherUserId, !isCurrentThread && nextMessage.sender_id !== currentUserId);
+
+            if (isCurrentThread) {
+              setThreadMessages((prev) => {
+                if (prev.some((m) => m.id === nextMessage.id)) {
+                  return prev;
+                }
+                return [...prev, nextMessage];
+              });
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(presenceChannel);
+      supabase.removeChannel(channel);
+    };
+  }, [currentUserId, upsertRawSummary]);
+
+  useEffect(() => {
+    if (!currentUserId || !selectedUser?.id || threadMessages.length === 0) return;
+
+    const unreadIds = threadMessages
+      .filter((message) => message.receiver_id === currentUserId && !message.read_at)
+      .map((message) => message.id);
+
+    if (unreadIds.length === 0) return;
+
+    const markAsRead = async () => {
+      try {
+        const { error: rpcError } = await supabase.rpc("mark_messages_as_read", {
+          message_ids: unreadIds,
+        });
+
+        if (rpcError) {
+          throw new Error(rpcError.message);
+        }
+
+        setThreadMessages((previous) =>
+          previous.map((message) =>
+            unreadIds.includes(message.id)
+              ? { ...message, read_at: message.read_at ?? new Date().toISOString() }
+              : message
+          )
+        );
+
+        setRawSummaries((prev) =>
+          prev.map((r) =>
+            r.other_user_id === selectedUser.id
+              ? { ...r, unread_count: 0 }
+              : r
+          )
+        );
+      } catch (err: any) {
+        logError(err, { context: "useMessages.markAsRead" });
+        toast({
+          title: "Failed to mark messages as read",
+          description: err.message || "An unexpected error occurred",
+          variant: "destructive",
+        });
+      }
+    };
+
+    void markAsRead();
+  }, [currentUserId, selectedUser?.id, threadMessages]);
+
+  useEffect(() => {
+    if (selectedUser) return;
+
+    const firstConversation = conversationSummaries[0]?.profile ?? null;
+    if (firstConversation) {
+      setSelectedUser(firstConversation);
+    }
+  }, [conversationSummaries, selectedUser]);
+
+  const sendMessage = useCallback(async (content: string) => {
+    if (!content || !selectedUser || !currentUserId) return false;
+
+    if (content.length > 1000) {
+      toast({
+        title: "Message too long",
+        description: "Message exceeds the 1000 character limit.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    try {
+      const { data, error: insertError } = await supabase
+        .from("messages")
+        .insert({
+          sender_id: currentUserId,
+          receiver_id: selectedUser.id,
+          content,
+          text: content,
+        })
+        .select("id,sender_id,receiver_id,content,text,message,created_at,read_at")
+        .single();
+
+      if (insertError) {
+        throw new Error(insertError.message);
+      }
+
+      if (data) {
+        const nextMessage = data as MessageRow;
+        setThreadMessages((prev) => {
+          if (prev.some((m) => m.id === nextMessage.id)) {
+            return prev;
+          }
+          return [...prev, nextMessage];
+        });
+
+        upsertRawSummary(nextMessage, selectedUser.id, false);
+        awardXP.mutate({ activity: "chat_message" });
+      }
+      return true;
+    } catch (err: any) {
+      logError(err, { context: "useMessages.sendMessage" });
+      toast({
+        title: "Failed to send message",
+        description: err.message || "An unexpected error occurred",
+        variant: "destructive",
+      });
+      return false;
+    }
+  }, [currentUserId, selectedUser, awardXP, upsertRawSummary]);
+
+  return {
+    profiles,
+    selectedUser,
+    setSelectedUser,
+    loadingUsers,
+    loadingConversations,
+    loadingThreadMessages,
+    loadingMoreThreadMessages,
+    hasMoreThreadMessages,
+    error,
+    onlineUserIds,
+    conversationSummaries,
+    threadMessages,
+    selectedConversation,
+    sendMessage,
+    loadMoreThreadMessages,
+  };
+}

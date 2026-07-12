@@ -22,7 +22,11 @@ export default function Messages({ user }: MessagesProps) {
     selectedUser,
     setSelectedUser,
     loadingUsers,
-    loadingMessages,
+    loadingConversations,
+    loadingThreadMessages,
+    loadingMoreThreadMessages,
+    hasMoreThreadMessages,
+    loadMoreThreadMessages,
     threadMessages,
     selectedConversation,
     sendMessage,
@@ -61,7 +65,7 @@ export default function Messages({ user }: MessagesProps) {
           onlineUserIds={onlineUserIds}
           selectedUser={selectedUser}
           loadingUsers={loadingUsers}
-          loadingMessages={loadingMessages}
+          loadingConversations={loadingConversations}
           onSelectProfile={handleSelectProfile}
           showSidebarOnMobile={showSidebarOnMobile}
         />
@@ -71,6 +75,10 @@ export default function Messages({ user }: MessagesProps) {
           selectedUser={selectedUser}
           selectedConversation={selectedConversation}
           threadMessages={threadMessages}
+          loadingThreadMessages={loadingThreadMessages}
+          loadingMoreThreadMessages={loadingMoreThreadMessages}
+          hasMoreThreadMessages={hasMoreThreadMessages}
+          loadMoreThreadMessages={loadMoreThreadMessages}
           sendMessage={sendMessage}
           showSidebarOnMobile={showSidebarOnMobile}
           setShowSidebarOnMobile={setShowSidebarOnMobile}
