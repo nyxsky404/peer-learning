@@ -11,6 +11,7 @@ import {
   Zap,
 } from "lucide-react";
 
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { NotificationsDropdown } from "@/components/NotificationsDropdown";
 import { Check } from "lucide-react";
@@ -277,14 +278,18 @@ const Discover = () => {
       status: 'pending'
     });
 
-    if (!error) {
-      await (supabase as any).from("notifications").insert({
-        user_id: peerId,
-        type: 'system',
-        title: 'New Connection Request',
-        body: `${currentUser.name || 'Someone'} wants to connect with you!`,
-      });
+    if (error) {
+      setConnections((prev) => prev.filter((id) => id !== peerId));
+      toast.error("Could not send the connection request. Please try again.");
+      return;
     }
+
+    await (supabase as any).from("notifications").insert({
+      user_id: peerId,
+      type: 'system',
+      title: 'New Connection Request',
+      body: `${currentUser.name || 'Someone'} wants to connect with you!`,
+    });
   }, [connections, currentUser]);
 
   return (
