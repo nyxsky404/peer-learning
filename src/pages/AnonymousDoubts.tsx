@@ -88,6 +88,7 @@ export default function AnonymousDoubts() {
         doubts.map((d) => (d.id === id ? { ...d, upvotes: doubt.upvotes } : d))
       );
       setVotedIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
+      toast.error("Failed to upvote doubt. Please try again.");
     }
   };
 
