@@ -1,7 +1,6 @@
 import React, { useRef, useState } from "react";
 import { Camera, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { API_BASE_URL } from "@/config/api";
 
 type AvatarUploadProps = {
   currentAvatarUrl: string;
@@ -69,8 +68,6 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
       });
 
       if (!res.ok) {
-        const text = await res.text();
-
         if (res.status === 401) {
           throw new Error(
             "Your session has expired. Please sign in again and retry the upload."

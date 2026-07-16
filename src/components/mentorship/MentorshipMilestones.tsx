@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { CheckCircle2, Circle, Plus, Trophy, Calendar, Map } from "lucide-react";
@@ -16,7 +16,7 @@ export function MentorshipMilestones({ userId, isMentor }: MentorshipMilestonesP
   const [newMenteeId, setNewMenteeId] = useState("");
   const [isCreatingPath, setIsCreatingPath] = useState(false);
 
-  const fetchPaths = async () => {
+  const fetchPaths = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("mentorship_paths")
@@ -35,11 +35,11 @@ export function MentorshipMilestones({ userId, isMentor }: MentorshipMilestonesP
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
 
   useEffect(() => {
     fetchPaths();
-  }, [userId]);
+  }, [userId, fetchPaths]);
 
   const createPath = async () => {
     if (!newGoal || !newMenteeId) {
