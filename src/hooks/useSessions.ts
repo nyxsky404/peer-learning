@@ -96,9 +96,12 @@ export function useSessions(user: any) {
   // - sessionSummary: without this, a summary generated for a previous
   //   video session can keep showing after switching to a different
   //   session, making it look like it belongs to the new one.
+  // - messages: without this, the previous session's thread stays rendered
+  //   for the whole fetch round-trip after switching.
   useEffect(() => {
     setParticipantCount(1);
     setSessionSummary(null);
+    setMessages([]);
   }, [selectedSession]);
 
   useEffect(() => {
