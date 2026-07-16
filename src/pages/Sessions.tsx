@@ -67,7 +67,7 @@ export default function Sessions() {
 
             {isVideoActive && selectedSession ? (
               <VideoRoom
-                roomName={selectedSession.id}
+                roomName={selectedSession.jitsi_room_token || selectedSession.id}
                 userName={user?.user_metadata?.full_name || "Anonymous Learner"}
                 onLeave={handleLeaveVideo}
               />
