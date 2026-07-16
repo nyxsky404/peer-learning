@@ -1,4 +1,4 @@
-import { memo, useContext, useMemo, useState } from "react";
+import { memo, useContext, useEffect, useMemo, useState } from "react";
 import { Archive, Bookmark, Code, Download, FileText, Loader2, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -33,6 +33,8 @@ const ResourceCard = ({ resource, onDelete }: ResourceCardProps) => {
 
   const [isDownloading, setIsDownloading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [localUpvotes, setLocalUpvotes] = useState(resource.upvotes_count || 0);
+  const [localDownvotes, setLocalDownvotes] = useState(resource.downvotes_count || 0);
 
   const isOwner = currentUser?.id === resource.uploaded_by;
 
@@ -40,6 +42,11 @@ const ResourceCard = ({ resource, onDelete }: ResourceCardProps) => {
     resource.id,
     currentUser?.id
   );
+
+  useEffect(() => {
+    setLocalUpvotes(resource.upvotes_count || 0);
+    setLocalDownvotes(resource.downvotes_count || 0);
+  }, [resource.upvotes_count, resource.downvotes_count]);
 
   const resourceIcon = useMemo(() => {
     if (["py", "js", "ts"].includes(resource.file_type)) {
@@ -90,9 +97,25 @@ const ResourceCard = ({ resource, onDelete }: ResourceCardProps) => {
       toast.error("Please login to vote");
       return;
     }
+
+    const previousVote = vote;
+    const newVote = previousVote === type ? null : type;
+
+    let upvoteDelta = 0;
+    let downvoteDelta = 0;
+    if (previousVote === 1) upvoteDelta -= 1;
+    if (previousVote === -1) downvoteDelta -= 1;
+    if (newVote === 1) upvoteDelta += 1;
+    if (newVote === -1) downvoteDelta += 1;
+
+    setLocalUpvotes((prev) => prev + upvoteDelta);
+    setLocalDownvotes((prev) => prev + downvoteDelta);
+
     try {
-      await toggleVote(vote === type ? null : type);
+      await toggleVote(newVote);
     } catch (e) {
+      setLocalUpvotes((prev) => prev - upvoteDelta);
+      setLocalDownvotes((prev) => prev - downvoteDelta);
       toast.error("Failed to register vote");
     }
   };
@@ -169,7 +192,7 @@ const ResourceCard = ({ resource, onDelete }: ResourceCardProps) => {
             onClick={() => handleVote(1)}
           >
             <ThumbsUp className="h-4 w-4" fill={vote === 1 ? "currentColor" : "none"} />
-            <span className="text-xs font-medium">{resource.upvotes_count || 0}</span>
+            <span className="text-xs font-medium">{localUpvotes}</span>
           </Button>
           <Button 
             variant="ghost" 
@@ -178,7 +201,7 @@ const ResourceCard = ({ resource, onDelete }: ResourceCardProps) => {
             onClick={() => handleVote(-1)}
           >
             <ThumbsDown className="h-4 w-4" fill={vote === -1 ? "currentColor" : "none"} />
-            <span className="text-xs font-medium">{resource.downvotes_count || 0}</span>
+            <span className="text-xs font-medium">{localDownvotes}</span>
           </Button>
         </div>
 
