@@ -29,6 +29,8 @@ export default function Canvas({ roomId }: Props) {
 
   const { user } = useAuth();
 
+  const [hostId, setHostId] = useState<string | null>(null);
+
   const [tool, setTool] = useState<ToolType>("pen");
 
   const [color, setColor] = useState("#ffffff");
@@ -132,17 +134,22 @@ export default function Canvas({ roomId }: Props) {
   };
 
   const pushEvent = (event: WhiteboardEvent) => {
-    strokesRef.current.push(event);
+    const ownedEvent: WhiteboardEvent = {
+      ...event,
+      user_id: user?.id,
+    };
+
+    strokesRef.current.push(ownedEvent);
 
     const ctx = getContext();
 
     if (!ctx) return;
 
-    drawEvent(ctx, event);
+    drawEvent(ctx, ownedEvent);
 
-    broadcastEvent(event);
+    broadcastEvent(ownedEvent);
 
-    persistEvent(event);
+    persistEvent(ownedEvent);
   };
 
   useEffect(() => {
@@ -157,6 +164,16 @@ export default function Canvas({ roomId }: Props) {
 
   useEffect(() => {
     const initializeBoard = async () => {
+      const { data: room } = await supabase
+        .from("study_rooms" as any)
+        .select("created_by")
+        .eq("id", roomId)
+        .single();
+
+      if (room) {
+        setHostId((room as any).created_by);
+      }
+
       const { data } = await supabase
         .from("whiteboard_events" as any)
         .select("*")
@@ -186,6 +203,18 @@ export default function Canvas({ roomId }: Props) {
           if (payload.senderId === user?.id) return;
 
           const event: WhiteboardEvent = payload;
+
+          if (event.type === "undo") {
+            strokesRef.current = strokesRef.current.filter(
+              (stroke) =>
+                stroke.payload?.strokeId !==
+                event.payload?.strokeId
+            );
+
+            replayCanvas();
+
+            return;
+          }
 
           strokesRef.current.push(event);
 
@@ -291,6 +320,8 @@ export default function Canvas({ roomId }: Props) {
   let lastStrokeId: string | undefined;
 
   for (let i = events.length - 1; i >= 0; i--) {
+    if (events[i].user_id !== user?.id) continue;
+
     const strokeId =
       events[i].payload?.strokeId;
 
@@ -316,22 +347,23 @@ export default function Canvas({ roomId }: Props) {
     .from("whiteboard_events" as any)
     .delete()
     .eq("room_id", roomId)
+    .eq("user_id", user?.id)
     .eq(
       "payload->>strokeId",
       lastStrokeId
     );
 
   broadcastEvent({
-    type: "clear",
-    payload: {},
+    type: "undo",
+    payload: {
+      strokeId: lastStrokeId,
+    },
   });
-
-  for (const event of updated) {
-    broadcastEvent(event);
-  }
 };
 
   const clearBoard = async () => {
+  if (user?.id !== hostId) return;
+
   const ctx = getContext();
 
   if (!ctx) return;
@@ -402,12 +434,14 @@ export default function Canvas({ roomId }: Props) {
     Undo
   </button>
 
-  <button
-    onClick={clearBoard}
-    className="px-3 py-1 rounded text-sm bg-red-600 text-white hover:bg-red-700"
-  >
-    Clear
-  </button>
+  {user?.id === hostId && (
+    <button
+      onClick={clearBoard}
+      className="px-3 py-1 rounded text-sm bg-red-600 text-white hover:bg-red-700"
+    >
+      Clear
+    </button>
+  )}
 </div>
       </div>
 
