@@ -68,7 +68,7 @@ type SidebarProps = {
   onlineUserIds: string[];
   selectedUser: ProfileSummary | null;
   loadingUsers: boolean;
-  loadingMessages: boolean;
+  loadingConversations: boolean;
   onSelectProfile: (profile: ProfileSummary) => void;
   showSidebarOnMobile: boolean;
 };
@@ -80,7 +80,7 @@ export function Sidebar({
   onlineUserIds,
   selectedUser,
   loadingUsers,
-  loadingMessages,
+  loadingConversations,
   onSelectProfile,
   showSidebarOnMobile,
 }: SidebarProps) {
@@ -162,7 +162,7 @@ export function Sidebar({
             <span className="text-xs text-slate-500">{conversationSummaries.length}</span>
           </div>
 
-          {loadingUsers || loadingMessages ? (
+          {loadingUsers || loadingConversations ? (
             <div className="space-y-3">
               <div className="h-20 animate-pulse rounded-3xl bg-white/5" />
               <div className="h-20 animate-pulse rounded-3xl bg-white/5" />

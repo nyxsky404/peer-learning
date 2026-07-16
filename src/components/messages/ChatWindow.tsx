@@ -1,5 +1,5 @@
 import { forwardRef, memo, useState, useEffect, useRef } from "react";
-import { ArrowLeft, Send, Phone, Video } from "lucide-react";
+import { ArrowLeft, Send, Phone, Video, Loader2 } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ProfileSummary, ConversationSummary, MessageRow } from "@/hooks/useMessages";
 import { getDisplayName, getMessageBody, getRoleLabel, formatRelativeTime, formatTime } from "./utils";
@@ -43,6 +43,10 @@ type ChatWindowProps = {
   selectedUser: ProfileSummary | null;
   selectedConversation: ConversationSummary | null;
   threadMessages: MessageRow[];
+  loadingThreadMessages: boolean;
+  loadingMoreThreadMessages: boolean;
+  hasMoreThreadMessages: boolean;
+  loadMoreThreadMessages: () => Promise<void>;
   sendMessage: (content: string) => Promise<boolean>;
   showSidebarOnMobile: boolean;
   setShowSidebarOnMobile: (show: boolean) => void;
@@ -53,12 +57,17 @@ export function ChatWindow({
   selectedUser,
   selectedConversation,
   threadMessages,
+  loadingThreadMessages,
+  loadingMoreThreadMessages,
+  hasMoreThreadMessages,
+  loadMoreThreadMessages,
   sendMessage,
   showSidebarOnMobile,
   setShowSidebarOnMobile,
 }: ChatWindowProps) {
   const [newMessage, setNewMessage] = useState("");
   const threadMessagesRef = useRef<HTMLDivElement | null>(null);
+  const hasAutoScrolledRef = useRef(false);
 
   const threadVirtualizer = useVirtualizer({
     count: threadMessages.length,
@@ -67,17 +76,31 @@ export function ChatWindow({
     overscan: 12,
   });
 
+  // Auto-scroll to the newest message the first time a thread loads, and on
+  // every subsequent new message. Loading older pages (which prepend to the
+  // array) should not yank the view back down.
   useEffect(() => {
-    if (threadMessages.length > 0) {
+    if (threadMessages.length === 0) {
+      hasAutoScrolledRef.current = false;
+      return;
+    }
+
+    if (!hasAutoScrolledRef.current) {
       threadVirtualizer.scrollToIndex(threadMessages.length - 1, { align: "end" });
+      hasAutoScrolledRef.current = true;
     }
   }, [threadMessages.length, threadVirtualizer]);
+
+  useEffect(() => {
+    hasAutoScrolledRef.current = false;
+  }, [selectedUser?.id]);
 
   const handleSend = async () => {
     const content = newMessage.trim();
     if (!content) return;
-    
+
     setNewMessage("");
+    threadVirtualizer.scrollToIndex(threadMessages.length, { align: "end" });
     const success = await sendMessage(content);
     if (!success) {
       setNewMessage(content); // restore on failure
@@ -130,36 +153,60 @@ export function ChatWindow({
           </header>
 
           <div ref={threadMessagesRef} className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
-            <div style={{ height: `${threadVirtualizer.getTotalSize()}px`, position: "relative" }}>
-              {threadVirtualizer.getVirtualItems().map((virtualItem) => {
-                const message = threadMessages[virtualItem.index];
-                const isMine = message.sender_id === currentUserId;
-                const timeLabel = formatTime(message.created_at);
-
-                return (
-                  <div
-                    key={message.id}
-                    data-index={virtualItem.index}
-                    ref={threadVirtualizer.measureElement}
-                    style={{
-                      transform: `translateY(${virtualItem.start}px)`,
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      width: "100%",
-                    }}
-                    className="pb-3"
-                  >
-                    <ThreadBubble
-                      message={message}
-                      isMine={isMine}
-                      timeLabel={timeLabel}
-                      isRead={!!message.read_at}
-                    />
+            {loadingThreadMessages && threadMessages.length === 0 ? (
+              <div className="space-y-3">
+                <div className="ml-auto h-14 w-2/3 animate-pulse rounded-3xl bg-white/5" />
+                <div className="h-14 w-2/3 animate-pulse rounded-3xl bg-white/5" />
+                <div className="ml-auto h-14 w-1/2 animate-pulse rounded-3xl bg-white/5" />
+              </div>
+            ) : (
+              <>
+                {hasMoreThreadMessages && (
+                  <div className="mb-4 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => void loadMoreThreadMessages()}
+                      disabled={loadingMoreThreadMessages}
+                      className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-medium text-slate-300 transition hover:bg-white/10 disabled:opacity-50"
+                    >
+                      {loadingMoreThreadMessages && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      {loadingMoreThreadMessages ? "Loading earlier messages..." : "Load earlier messages"}
+                    </button>
                   </div>
-                );
-              })}
-            </div>
+                )}
+
+                <div style={{ height: `${threadVirtualizer.getTotalSize()}px`, position: "relative" }}>
+                  {threadVirtualizer.getVirtualItems().map((virtualItem) => {
+                    const message = threadMessages[virtualItem.index];
+                    const isMine = message.sender_id === currentUserId;
+                    const timeLabel = formatTime(message.created_at);
+
+                    return (
+                      <div
+                        key={message.id}
+                        data-index={virtualItem.index}
+                        ref={threadVirtualizer.measureElement}
+                        style={{
+                          transform: `translateY(${virtualItem.start}px)`,
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
+                          width: "100%",
+                        }}
+                        className="pb-3"
+                      >
+                        <ThreadBubble
+                          message={message}
+                          isMine={isMine}
+                          timeLabel={timeLabel}
+                          isRead={!!message.read_at}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
 
           <div className="border-t border-white/10 bg-slate-950 p-4 sm:p-5">

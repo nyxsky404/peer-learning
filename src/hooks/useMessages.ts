@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, Dispatch, SetStateAction } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, Dispatch, SetStateAction } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAwardXP } from "@/hooks/useAwardXP";
 import { toast } from "@/hooks/use-toast";
@@ -42,20 +42,41 @@ export type ConversationSummary = {
   isOnline: boolean;
 };
 
+// Row shape returned by the `get_conversation_summaries` RPC. One row per
+// conversation partner, holding only their most recent message + unread
+// count — independent of any global message limit.
+type RawConversationSummary = {
+  other_user_id: string;
+  message_id: string;
+  sender_id: string | null;
+  receiver_id: string | null;
+  content: string | null;
+  text: string | null;
+  message: string | null;
+  created_at: string;
+  read_at: string | null;
+  unread_count: number;
+};
+
 export type UseMessagesResult = {
   profiles: ProfileSummary[];
-  messages: MessageRow[];
   selectedUser: ProfileSummary | null;
   setSelectedUser: Dispatch<SetStateAction<ProfileSummary | null>>;
   loadingUsers: boolean;
-  loadingMessages: boolean;
+  loadingConversations: boolean;
+  loadingThreadMessages: boolean;
+  loadingMoreThreadMessages: boolean;
+  hasMoreThreadMessages: boolean;
   error: string | null;
   onlineUserIds: string[];
   conversationSummaries: ConversationSummary[];
   threadMessages: MessageRow[];
   selectedConversation: ConversationSummary | null;
   sendMessage: (content: string) => Promise<boolean>;
+  loadMoreThreadMessages: () => Promise<void>;
 };
+
+const THREAD_PAGE_SIZE = 50;
 
 const normalizeProfile = (row: ProfileRow | UserRow): ProfileSummary => ({
   id: row.id,
@@ -68,17 +89,31 @@ const normalizeProfile = (row: ProfileRow | UserRow): ProfileSummary => ({
   last_seen: "last_seen" in row ? row.last_seen : null,
 });
 
-const isThreadMessage = (message: MessageRow, currentUserId: string, otherUserId: string) => {
-  return (
-    (message.sender_id === currentUserId && message.receiver_id === otherUserId) ||
-    (message.sender_id === otherUserId && message.receiver_id === currentUserId)
-  );
-};
+const rawSummaryToMessage = (row: RawConversationSummary): MessageRow => ({
+  id: row.message_id,
+  sender_id: row.sender_id,
+  receiver_id: row.receiver_id,
+  content: row.content,
+  text: row.text,
+  message: row.message,
+  created_at: row.created_at,
+  read_at: row.read_at,
+});
+
+const threadOrFilter = (currentUserId: string, otherUserId: string) =>
+  `and(sender_id.eq.${currentUserId},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${currentUserId})`;
 
 /**
  * Custom hook to manage real-time direct messages, online presence, and conversation threads.
- * Connects to Supabase for initial data fetch and sets up PostgreSQL real-time listeners.
- * 
+ *
+ * Conversation summaries (the inbox list) and the open thread's messages are
+ * fetched independently:
+ *  - `get_conversation_summaries` RPC returns the latest message + unread
+ *    count per conversation partner, so a partner's conversation can never
+ *    be pushed out by someone else's high message volume.
+ *  - The open thread is paginated (`THREAD_PAGE_SIZE` at a time) and loaded
+ *    only for the selected conversation.
+ *
  * @param {string | null} [currentUserId] - The UUID of the currently authenticated user.
  * @returns {UseMessagesResult} An object containing all conversation state and methods to interact with messages.
  */
@@ -86,87 +121,105 @@ export function useMessages(
   currentUserId?: string | null
 ): UseMessagesResult {
   const [profiles, setProfiles] = useState<ProfileSummary[]>([]);
-  const [messages, setMessages] = useState<MessageRow[]>([]);
+  const [rawSummaries, setRawSummaries] = useState<RawConversationSummary[]>([]);
+  const [threadMessages, setThreadMessages] = useState<MessageRow[]>([]);
   const [selectedUser, setSelectedUser] = useState<ProfileSummary | null>(null);
   const [loadingUsers, setLoadingUsers] = useState(true);
-  const [loadingMessages, setLoadingMessages] = useState(true);
+  const [loadingConversations, setLoadingConversations] = useState(true);
+  const [loadingThreadMessages, setLoadingThreadMessages] = useState(false);
+  const [loadingMoreThreadMessages, setLoadingMoreThreadMessages] = useState(false);
+  const [hasMoreThreadMessages, setHasMoreThreadMessages] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
 
   const awardXP = useAwardXP();
 
+  const selectedUserIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    selectedUserIdRef.current = selectedUser?.id ?? null;
+  }, [selectedUser?.id]);
+
   const profileMap = useMemo(() => {
     return new Map(profiles.map((profile) => [profile.id, profile]));
   }, [profiles]);
 
-  // Memoized derivation of conversation summaries from the raw message list.
-  // Group messages by user and calculate unread counts and latest activity time.
   const conversationSummaries = useMemo<ConversationSummary[]>(() => {
-    if (!currentUserId) return [];
+    const summaries: ConversationSummary[] = [];
 
-    const summaries = new Map<string, ConversationSummary>();
-
-    for (const message of messages) {
-      const otherUserId =
-        message.sender_id === currentUserId
-          ? message.receiver_id
-          : message.receiver_id === currentUserId
-            ? message.sender_id
-            : null;
-
-      if (!otherUserId) continue;
-
-      const profile = profileMap.get(otherUserId);
+    for (const row of rawSummaries) {
+      const profile = profileMap.get(row.other_user_id);
       if (!profile) continue;
 
-      const existing = summaries.get(otherUserId) ?? {
+      summaries.push({
         profile,
-        lastMessage: null,
-        unreadCount: 0,
-        isOnline: onlineUserIds.includes(otherUserId),
-      };
-
-      if (message.receiver_id === currentUserId && !message.read_at) {
-        existing.unreadCount += 1;
-      }
-
-      if (
-        !existing.lastMessage ||
-        new Date(message.created_at ?? 0).getTime() >
-          new Date(existing.lastMessage.created_at ?? 0).getTime()
-      ) {
-        existing.lastMessage = message;
-      }
-
-      existing.isOnline = onlineUserIds.includes(otherUserId);
-      summaries.set(otherUserId, existing);
+        lastMessage: rawSummaryToMessage(row),
+        unreadCount: row.unread_count,
+        isOnline: onlineUserIds.includes(row.other_user_id),
+      });
     }
 
-    return Array.from(summaries.values()).sort((left, right) => {
+    return summaries.sort((left, right) => {
       const leftTime = new Date(left.lastMessage?.created_at ?? 0).getTime();
       const rightTime = new Date(right.lastMessage?.created_at ?? 0).getTime();
       return rightTime - leftTime;
     });
-  }, [currentUserId, messages, onlineUserIds, profileMap]);
-
-  const threadMessages = useMemo(() => {
-    if (!currentUserId || !selectedUser?.id) return [];
-
-    return messages.filter((message) => isThreadMessage(message, currentUserId, selectedUser.id));
-  }, [currentUserId, messages, selectedUser?.id]);
+  }, [rawSummaries, profileMap, onlineUserIds]);
 
   const selectedConversation = useMemo(
     () => conversationSummaries.find((item) => item.profile.id === selectedUser?.id) ?? null,
     [conversationSummaries, selectedUser?.id]
   );
 
+  // Insert or refresh a partner's summary row when a message is sent/received,
+  // without needing to re-run the aggregate RPC.
+  const upsertRawSummary = useCallback(
+    (message: MessageRow, otherUserId: string, incrementUnread: boolean) => {
+      setRawSummaries((prev) => {
+        const idx = prev.findIndex((r) => r.other_user_id === otherUserId);
+        const existing = idx === -1 ? null : prev[idx];
+        const nextUnreadCount = incrementUnread ? (existing?.unread_count ?? 0) + 1 : (existing?.unread_count ?? 0);
+
+        const candidateRow: RawConversationSummary = {
+          other_user_id: otherUserId,
+          message_id: message.id,
+          sender_id: message.sender_id,
+          receiver_id: message.receiver_id,
+          content: message.content,
+          text: message.text,
+          message: message.message ?? null,
+          created_at: message.created_at ?? new Date().toISOString(),
+          read_at: message.read_at,
+          unread_count: nextUnreadCount,
+        };
+
+        if (!existing) {
+          return [...prev, candidateRow];
+        }
+
+        const existingTime = new Date(existing.created_at).getTime();
+        const incomingTime = new Date(candidateRow.created_at).getTime();
+
+        const next = [...prev];
+        next[idx] =
+          incomingTime >= existingTime
+            ? candidateRow
+            : { ...existing, unread_count: nextUnreadCount };
+        return next;
+      });
+    },
+    []
+  );
+
   useEffect(() => {
     if (!currentUserId) {
       setProfiles([]);
-      setMessages([]);
+      setRawSummaries([]);
+      setThreadMessages([]);
       setSelectedUser(null);
       setLoadingUsers(false);
-      setLoadingMessages(false);
+      setLoadingConversations(false);
+      setLoadingThreadMessages(false);
+      setHasMoreThreadMessages(false);
       setError(null);
       return;
     }
@@ -205,6 +258,50 @@ export function useMessages(
     getUsers();
   }, [currentUserId]);
 
+  // Fetch conversation summaries independently of any single-message-list
+  // limit — one row per conversation partner, via `get_conversation_summaries`.
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    let cancelled = false;
+
+    const getConversationSummaries = async () => {
+      setLoadingConversations(true);
+      setError(null);
+
+      try {
+        const { data, error: rpcError } = await (supabase as any).rpc("get_conversation_summaries", {
+          p_user_id: currentUserId,
+        });
+
+        if (rpcError) {
+          throw new Error(rpcError.message);
+        }
+
+        if (!cancelled) {
+          setRawSummaries((data ?? []) as unknown as RawConversationSummary[]);
+        }
+      } catch (err: any) {
+        if (cancelled) return;
+        logError(err, { context: "useMessages.getConversationSummaries" });
+        setError("Failed to load conversations");
+        toast({
+          title: "Failed to load conversations",
+          description: err.message || "An unexpected error occurred",
+          variant: "destructive",
+        });
+      } finally {
+        if (!cancelled) setLoadingConversations(false);
+      }
+    };
+
+    getConversationSummaries();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUserId]);
+
   // Set up real-time listener for profile updates.
   // This ensures the UI reflects name/avatar changes immediately across all clients.
   useEffect(() => {
@@ -225,13 +322,13 @@ export function useMessages(
             setProfiles((prev) => {
               const updated = normalizeProfile(payload.new as ProfileRow);
               const index = prev.findIndex((p) => p.id === updated.id);
-              
+
               if (index === -1) {
                 const newProfiles = [...prev, updated];
                 newProfiles.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
                 return newProfiles;
               }
-              
+
               const newProfiles = [...prev];
               newProfiles[index] = { ...newProfiles[index], ...updated };
               return newProfiles;
@@ -246,31 +343,40 @@ export function useMessages(
     };
   }, [currentUserId]);
 
+  // Load initial thread messages when selectedUser changes
   useEffect(() => {
-    if (!currentUserId) return;
+    if (!currentUserId || !selectedUser?.id) {
+      setThreadMessages([]);
+      setHasMoreThreadMessages(false);
+      return;
+    }
 
-    const loadMessages = async () => {
-      setLoadingMessages(true);
+    let cancelled = false;
+
+    const loadInitialThread = async () => {
+      setLoadingThreadMessages(true);
       setError(null);
 
       try {
         const { data, error: queryError } = await supabase
           .from("messages")
           .select("id,sender_id,receiver_id,content,text,message,created_at,read_at")
-          .or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
+          .or(threadOrFilter(currentUserId, selectedUser.id))
           .order("created_at", { ascending: false })
-          .limit(100);
+          .limit(THREAD_PAGE_SIZE);
 
         if (queryError) {
           throw new Error(queryError.message);
         }
 
-        if (data) {
-          const typedMessages = data as unknown as MessageRow[];
-          setMessages(typedMessages.reverse());
+        if (!cancelled) {
+          const typedMessages = (data ?? []) as MessageRow[];
+          setThreadMessages(typedMessages.reverse());
+          setHasMoreThreadMessages(typedMessages.length === THREAD_PAGE_SIZE);
         }
       } catch (err: any) {
-        logError(err, { context: "useMessages.loadMessages" });
+        if (cancelled) return;
+        logError(err, { context: "useMessages.loadInitialThread" });
         setError("Failed to load messages");
         toast({
           title: "Failed to load messages",
@@ -278,12 +384,56 @@ export function useMessages(
           variant: "destructive",
         });
       } finally {
-        setLoadingMessages(false);
+        if (!cancelled) {
+          setLoadingThreadMessages(false);
+        }
       }
     };
 
-    loadMessages();
-  }, [currentUserId]);
+    loadInitialThread();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUserId, selectedUser?.id]);
+
+  const loadMoreThreadMessages = useCallback(async () => {
+    if (!currentUserId || !selectedUser?.id || loadingMoreThreadMessages || !hasMoreThreadMessages || threadMessages.length === 0) {
+      return;
+    }
+
+    setLoadingMoreThreadMessages(true);
+    const oldestTimestamp = threadMessages[0].created_at;
+
+    try {
+      const { data, error: queryError } = await supabase
+        .from("messages")
+        .select("id,sender_id,receiver_id,content,text,message,created_at,read_at")
+        .or(threadOrFilter(currentUserId, selectedUser.id))
+        .lt("created_at", oldestTimestamp)
+        .order("created_at", { ascending: false })
+        .limit(THREAD_PAGE_SIZE);
+
+      if (queryError) {
+        throw new Error(queryError.message);
+      }
+
+      if (data) {
+        const typedMessages = (data ?? []) as MessageRow[];
+        setThreadMessages((prev) => [...typedMessages.reverse(), ...prev]);
+        setHasMoreThreadMessages(typedMessages.length === THREAD_PAGE_SIZE);
+      }
+    } catch (err: any) {
+      logError(err, { context: "useMessages.loadMoreThreadMessages" });
+      toast({
+        title: "Failed to load earlier messages",
+        description: err.message || "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingMoreThreadMessages(false);
+    }
+  }, [currentUserId, selectedUser?.id, loadingMoreThreadMessages, hasMoreThreadMessages, threadMessages]);
 
   // Manage online presence using Supabase Presence.
   // This tracks which users are currently viewing the app and listens for incoming real-time messages.
@@ -330,13 +480,24 @@ export function useMessages(
             return;
           }
 
-          setMessages((previous) => {
-            if (previous.some((message) => message.id === nextMessage.id)) {
-              return previous;
-            }
+          const otherUserId =
+            nextMessage.sender_id === currentUserId
+              ? nextMessage.receiver_id
+              : nextMessage.sender_id;
 
-            return [...previous, nextMessage];
-          });
+          if (otherUserId) {
+            const isCurrentThread = selectedUserIdRef.current === otherUserId;
+            upsertRawSummary(nextMessage, otherUserId, !isCurrentThread && nextMessage.sender_id !== currentUserId);
+
+            if (isCurrentThread) {
+              setThreadMessages((prev) => {
+                if (prev.some((m) => m.id === nextMessage.id)) {
+                  return prev;
+                }
+                return [...prev, nextMessage];
+              });
+            }
+          }
         }
       )
       .subscribe();
@@ -345,7 +506,7 @@ export function useMessages(
       supabase.removeChannel(presenceChannel);
       supabase.removeChannel(channel);
     };
-  }, [currentUserId]);
+  }, [currentUserId, upsertRawSummary]);
 
   useEffect(() => {
     if (!currentUserId || !selectedUser?.id || threadMessages.length === 0) return;
@@ -366,11 +527,19 @@ export function useMessages(
           throw new Error(rpcError.message);
         }
 
-        setMessages((previous) =>
+        setThreadMessages((previous) =>
           previous.map((message) =>
             unreadIds.includes(message.id)
               ? { ...message, read_at: message.read_at ?? new Date().toISOString() }
               : message
+          )
+        );
+
+        setRawSummaries((prev) =>
+          prev.map((r) =>
+            r.other_user_id === selectedUser.id
+              ? { ...r, unread_count: 0 }
+              : r
           )
         );
       } catch (err: any) {
@@ -424,11 +593,15 @@ export function useMessages(
       }
 
       if (data) {
-        setMessages((previous) =>
-          previous.some((message) => message.id === (data as MessageRow).id)
-            ? previous
-            : [...previous, data as MessageRow]
-        );
+        const nextMessage = data as MessageRow;
+        setThreadMessages((prev) => {
+          if (prev.some((m) => m.id === nextMessage.id)) {
+            return prev;
+          }
+          return [...prev, nextMessage];
+        });
+
+        upsertRawSummary(nextMessage, selectedUser.id, false);
         awardXP.mutate({ activity: "chat_message" });
       }
       return true;
@@ -441,22 +614,23 @@ export function useMessages(
       });
       return false;
     }
-  }, [currentUserId, selectedUser, awardXP]);
+  }, [currentUserId, selectedUser, awardXP, upsertRawSummary]);
 
   return {
     profiles,
-    messages,
     selectedUser,
     setSelectedUser,
     loadingUsers,
-    loadingMessages,
+    loadingConversations,
+    loadingThreadMessages,
+    loadingMoreThreadMessages,
+    hasMoreThreadMessages,
     error,
     onlineUserIds,
     conversationSummaries,
     threadMessages,
     selectedConversation,
     sendMessage,
+    loadMoreThreadMessages,
   };
 }
-
-// Fix for #1163: Fixed subscription memory leaks
