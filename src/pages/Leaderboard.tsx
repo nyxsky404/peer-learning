@@ -92,10 +92,10 @@ const LeaderboardRow = memo(({ entry, index, isCurrentUser }: LeaderboardRowProp
           <Flame className="h-5 w-5 text-yellow-400" />
           <div>
             <p className="text-xs text-gray-400">
-              Score {entry.raw_score !== undefined && `(${entry.raw_score} raw)`}
+              Score {entry.raw_score != null && `(${entry.raw_score} raw)`}
             </p>
             <h2 className="text-xl font-black text-cyan-400">
-              {entry.decayed_score !== undefined ? Math.round(entry.decayed_score) : entry.xp}
+              {entry.decayed_score != null ? Math.round(entry.decayed_score) : entry.xp}
             </h2>
           </div>
         </div>
@@ -502,7 +502,7 @@ const Leaderboard = () => {
                   </h3>
 
                   <p className="text-sm text-gray-400">
-                    {entry.decayed_score !== undefined ? Math.round(entry.decayed_score) : entry.xp} XP
+                    {entry.decayed_score != null ? Math.round(entry.decayed_score) : entry.xp} XP
                   </p>
 
                   <div

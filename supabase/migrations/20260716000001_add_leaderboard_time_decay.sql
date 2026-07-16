@@ -30,7 +30,7 @@ BEGIN
   ELSIF p_filter = 'Monthly' THEN
     v_cutoff := current_timestamp - interval '1 month';
   ELSE
-    v_cutoff := '1970-01-01'::timestamp;
+    v_cutoff := current_timestamp - interval '1 year';
   END IF;
 
   v_lambda := LN(2) / GREATEST(decay_days, 1);
