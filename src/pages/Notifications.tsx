@@ -10,7 +10,7 @@ const Notifications = () => {
       const { data, error } = await (supabase as any)
         .from("sessions")
         .select("*")
-        .eq("status", "upcoming")
+        .eq("status", "scheduled")
         .limit(50);
 
       if (!error) setAlerts(data);
