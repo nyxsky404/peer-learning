@@ -239,7 +239,7 @@ const Leaderboard = () => {
 
     init();
 
-  }, [user, filter]);
+  }, [user, filter, ensureUserExists, fetchLeaderboard]);
 
   // REALTIME
   // We use a ref so the realtime listener always calls the latest fetchLeaderboard, 
