@@ -512,7 +512,10 @@ CREATE POLICY "Users can insert doubts"
 CREATE POLICY "Admins can view contact messages" 
   ON public.contact_messages FOR SELECT USING (public.has_role(auth.uid(), 'admin'));
 CREATE POLICY "Anyone can insert contact messages" 
-  ON public.contact_messages FOR INSERT WITH CHECK (true);
+  ON public.contact_messages FOR INSERT WITH CHECK (
+    public.contact_recent_count(email, 10) < 3
+    AND NOT public.contact_duplicate_exists(email, message, 10)
+  );
 
 -- users table (if it exists outside auth schema)
 DO $$
