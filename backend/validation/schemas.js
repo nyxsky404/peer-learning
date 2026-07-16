@@ -90,7 +90,7 @@ export const aiSchemas = {
     body: z.object({
       messages: z.array(
         z.object({
-          role: z.string().optional(),
+          role: z.enum(["user", "assistant"]),
           content: z.string().trim().min(1).max(4000),
         })
       ).min(1).max(MAX_ASK_MESSAGES),
