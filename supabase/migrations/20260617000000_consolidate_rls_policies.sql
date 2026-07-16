@@ -475,17 +475,114 @@ CREATE POLICY "Users can remove votes"
 
 -- whiteboard_events
 CREATE POLICY "Anyone can view whiteboard events" 
-  ON public.whiteboard_events FOR SELECT USING (true);
+  ON public.whiteboard_events FOR SELECT USING (
+    EXISTS (
+      SELECT 1
+      FROM public.study_rooms sr
+      WHERE sr.id = whiteboard_events.room_id
+        AND (
+          NOT sr.is_private
+          OR sr.created_by = auth.uid()
+          OR EXISTS (
+            SELECT 1
+            FROM public.study_room_participants srp
+            WHERE srp.room_id = sr.id
+              AND srp.profile_id = auth.uid()
+          )
+        )
+    )
+  );
 CREATE POLICY "Users can create whiteboard events" 
-  ON public.whiteboard_events FOR INSERT WITH CHECK (true);
+  ON public.whiteboard_events FOR INSERT WITH CHECK (
+    user_id = auth.uid()
+    AND EXISTS (
+      SELECT 1
+      FROM public.study_rooms sr
+      WHERE sr.id = whiteboard_events.room_id
+        AND (
+          NOT sr.is_private
+          OR sr.created_by = auth.uid()
+          OR EXISTS (
+            SELECT 1
+            FROM public.study_room_participants srp
+            WHERE srp.room_id = sr.id
+              AND srp.profile_id = auth.uid()
+          )
+        )
+    )
+  );
 
 -- whiteboard_states
 CREATE POLICY "Anyone can view whiteboard states" 
-  ON public.whiteboard_states FOR SELECT USING (true);
+  ON public.whiteboard_states FOR SELECT USING (
+    EXISTS (
+      SELECT 1
+      FROM public.study_rooms sr
+      WHERE sr.id = whiteboard_states.room_id
+        AND (
+          NOT sr.is_private
+          OR sr.created_by = auth.uid()
+          OR EXISTS (
+            SELECT 1
+            FROM public.study_room_participants srp
+            WHERE srp.room_id = sr.id
+              AND srp.profile_id = auth.uid()
+          )
+        )
+    )
+  );
 CREATE POLICY "Users can update whiteboard states" 
-  ON public.whiteboard_states FOR INSERT WITH CHECK (true);
+  ON public.whiteboard_states FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.study_rooms sr
+      WHERE sr.id = whiteboard_states.room_id
+        AND (
+          NOT sr.is_private
+          OR sr.created_by = auth.uid()
+          OR EXISTS (
+            SELECT 1
+            FROM public.study_room_participants srp
+            WHERE srp.room_id = sr.id
+              AND srp.profile_id = auth.uid()
+          )
+        )
+    )
+  );
 CREATE POLICY "Users can modify whiteboard states" 
-  ON public.whiteboard_states FOR UPDATE USING (true);
+  ON public.whiteboard_states FOR UPDATE USING (
+    EXISTS (
+      SELECT 1
+      FROM public.study_rooms sr
+      WHERE sr.id = whiteboard_states.room_id
+        AND (
+          NOT sr.is_private
+          OR sr.created_by = auth.uid()
+          OR EXISTS (
+            SELECT 1
+            FROM public.study_room_participants srp
+            WHERE srp.room_id = sr.id
+              AND srp.profile_id = auth.uid()
+          )
+        )
+    )
+  ) WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.study_rooms sr
+      WHERE sr.id = whiteboard_states.room_id
+        AND (
+          NOT sr.is_private
+          OR sr.created_by = auth.uid()
+          OR EXISTS (
+            SELECT 1
+            FROM public.study_room_participants srp
+            WHERE srp.room_id = sr.id
+              AND srp.profile_id = auth.uid()
+          )
+        )
+    )
+  );
 
 --------------------------------------------------------------------------------
 -- 11. MISC TABLES
