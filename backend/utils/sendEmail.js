@@ -3,7 +3,7 @@ import { env } from "../config.js";
 
 // Stricter email validation following RFC 5321/5322 simplified rules
 // Prevents accepting invalid formats like 'a@b' (no TLD) or single-character components
-const isValidEmail = (value) => {
+export const isValidEmail = (value) => {
   const email = String(value).trim().toLowerCase();
 
   // RFC 5321/5322 simplified pattern with stricter requirements:
@@ -12,7 +12,7 @@ const isValidEmail = (value) => {
   // - TLD: at least 2 characters (required for valid domain)
   // The email is already normalised to lowercase above so the /i flag
   // is redundant and is intentionally omitted here.
-  const emailRegex = /^[a-z0-9._%-+]+@[a-z0-9.-]+\.[a-z]{2,}$/;
+  const emailRegex = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/;
 
   if (!emailRegex.test(email)) {
     return false;
