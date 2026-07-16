@@ -116,6 +116,10 @@ export default function MentorForm() {
     return formData.mentorship_types.length > 0;
   };
   const handleSubmit = async () => {
+    if (!validateMentorship()) {
+      setError("Please select at least one mentorship type");
+      return;
+    }
     setLoading(true);
     setError("");
     let isTimeout = false;
@@ -415,10 +419,6 @@ export default function MentorForm() {
                 }
                 if (step === 2 && !validateExperience()) {
                   setError("Please fill GitHub and LinkedIn profiles");
-                  return;
-                }
-                if (step === 3 && !validateMentorship()) {
-                  setError("Please select at least one mentorship type");
                   return;
                 }
                 setError("");
