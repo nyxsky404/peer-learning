@@ -17,7 +17,10 @@ export const formSchema = z
     date: z.date({ required_error: "A date is required." }),
     time: z.string().min(1, "Time is required."),
     durationPreset: z.number().optional(),
-    durationCustom: z.string().optional(),
+    durationCustom: z.string().optional().refine(
+      (val) => !val || (parseInt(val) >= 15 && parseInt(val) <= 480),
+      "Duration must be between 15 and 480 minutes"
+    ),
     seatLimit: z.string().optional(),
   })
   .refine(
@@ -62,7 +65,9 @@ export function useCreateSession({ onSuccess, setOpen }: UseCreateSessionProps) 
   const resolveDurationMinutes = useCallback((values: FormValues): number => {
     if (useCustom) {
       const c = parseInt(values.durationCustom ?? "", 10);
-      return isNaN(c) || c < 15 ? 60 : c;
+      if (isNaN(c) || c < 15) return 60;
+      if (c > 480) return 480;
+      return c;
     }
     return selectedPreset;
   }, [useCustom, selectedPreset]);
