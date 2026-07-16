@@ -218,7 +218,7 @@ const Portfolio = () => {
       isMounted = false;
       clearTimeout(timeout);
     };
-  }, [user?.id, user?.email, toast]);
+  }, [user, toast]);
 
   const updateAchievement = (index: number, achievement: Achievement) => {
     setForm((current) => ({
