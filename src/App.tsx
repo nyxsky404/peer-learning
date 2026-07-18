@@ -1,6 +1,6 @@
 import React, { useEffect, Suspense, useState, useRef } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, Router } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Router, useLocation } from "react-router-dom";
 
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -24,51 +24,68 @@ import MouseSparkles from "./components/MouseSparkles";
 import BackToTop from "./components/BackToTop";
 import { useAuth } from "@/contexts/useAuth";
 import SplashScreen from "./components/SplashScreen";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 
 
 
 // Lazy-loaded page & route-specific components (code-split per route)
-const Landing = React.lazy(() => import("./pages/Landing"));
-const Index = React.lazy(() => import("./pages/Index"));
-const NotFound = React.lazy(() => import("./pages/NotFound"));
-const Dashboard = React.lazy(() => import("./pages/Dashboard"));
-const MentorDashboard = React.lazy(() => import("./pages/MentorDashboard"));
-const LearnerDashboard = React.lazy(() => import("./pages/LearnerDashboard"));
-const Discover = React.lazy(() => import("./pages/Discover"));
-const Sessions = React.lazy(() => import("./pages/Sessions"));
-const Messages = React.lazy(() => import("./pages/Messages"));
-const Chat = React.lazy(() => import("./pages/Chat"));
-const Login = React.lazy(() => import("./pages/Login"));
-const Signup = React.lazy(() => import("./pages/Signup"));
-const Onboarding = React.lazy(() => import("./pages/Onboarding"));
-const Profile = React.lazy(() => import("./pages/Profile"));
-const EditProfile = React.lazy(() => import("./pages/EditProfile"));
-const Notifications = React.lazy(() => import("./pages/Notifications"));
-const Leaderboard = React.lazy(() => import("./pages/Leaderboard"));
-const Admin = React.lazy(() => import("./pages/Admin"));
-const ForgotPassword = React.lazy(() => import("./pages/ForgotPassword"));
-const ResetPassword = React.lazy(() => import("./pages/ResetPassword"));
-const AnonymousDoubts = React.lazy(() => import("./pages/AnonymousDoubts"));
-const AIPage = React.lazy(() => import("./pages/aipage"));
-const ContributorDashboard = React.lazy(() => import("./pages/ContributorDashboard"));
-const BecomeMentor = React.lazy(() => import("./pages/BecomeMentor"));
-const Portfolio = React.lazy(() => import("./pages/Portfolio"));
-const AuthCallback = React.lazy(() => import("./pages/AuthCallback"));
-const PublicPortfolio = React.lazy(() => import("./pages/PublicPortfolio"));
-const ResourceHub = React.lazy(() => import("@/pages/ResourceHub"));
-const StudyRooms = React.lazy(() => import("./components/StudyRooms"));
-const Room = React.lazy(() => import("./components/Room/Room"));
-const Contact = React.lazy(() => import("./pages/Contact"));
-const PrivacyPolicy = React.lazy(() => import("./pages/privacy"));
-const CookiesPolicy = React.lazy(() => import("./pages/cookies-policy"));
-const PeerReviewDashboard = React.lazy(() => import("./pages/PeerReviewDashboard"));
-const SubmitForReview = React.lazy(() => import("./pages/SubmitForReview"));
-const ReviewSubmission = React.lazy(() => import("./pages/ReviewSubmission"));
-const MockInterview = React.lazy(() => import("./pages/MockInterview"));
-const TermsAndConditions = React.lazy(
-  () => import("./pages/TermsAndConditions")
-);
+const LazyRoute = <T extends React.ComponentType<any>>(
+  loader: () => Promise<{ default: T }>
+) => {
+  const Component = React.lazy(loader);
+
+  return function RouteComponent(props: React.ComponentProps<T>) {
+    const location = useLocation();
+
+    return (
+      <ErrorBoundary key={location.key}>
+        <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#020617]"><div className="h-10 w-10 animate-spin rounded-full border-4 border-cyan-400 border-t-transparent" /></div>}>
+          <Component {...props} />
+        </Suspense>
+      </ErrorBoundary>
+    );
+  };
+};
+
+const Landing = LazyRoute(() => import("./pages/Landing"));
+const Index = LazyRoute(() => import("./pages/Index"));
+const NotFound = LazyRoute(() => import("./pages/NotFound"));
+const Dashboard = LazyRoute(() => import("./pages/Dashboard"));
+const MentorDashboard = LazyRoute(() => import("./pages/MentorDashboard"));
+const LearnerDashboard = LazyRoute(() => import("./pages/LearnerDashboard"));
+const Discover = LazyRoute(() => import("./pages/Discover"));
+const Sessions = LazyRoute(() => import("./pages/Sessions"));
+const Messages = LazyRoute(() => import("./pages/Messages"));
+const Chat = LazyRoute(() => import("./pages/Chat"));
+const Login = LazyRoute(() => import("./pages/Login"));
+const Signup = LazyRoute(() => import("./pages/Signup"));
+const Onboarding = LazyRoute(() => import("./pages/Onboarding"));
+const Profile = LazyRoute(() => import("./pages/Profile"));
+const EditProfile = LazyRoute(() => import("./pages/EditProfile"));
+const Notifications = LazyRoute(() => import("./pages/Notifications"));
+const Leaderboard = LazyRoute(() => import("./pages/Leaderboard"));
+const Admin = LazyRoute(() => import("./pages/Admin"));
+const ForgotPassword = LazyRoute(() => import("./pages/ForgotPassword"));
+const ResetPassword = LazyRoute(() => import("./pages/ResetPassword"));
+const AnonymousDoubts = LazyRoute(() => import("./pages/AnonymousDoubts"));
+const AIPage = LazyRoute(() => import("./pages/aipage"));
+const ContributorDashboard = LazyRoute(() => import("./pages/ContributorDashboard"));
+const BecomeMentor = LazyRoute(() => import("./pages/BecomeMentor"));
+const Portfolio = LazyRoute(() => import("./pages/Portfolio"));
+const AuthCallback = LazyRoute(() => import("./pages/AuthCallback"));
+const PublicPortfolio = LazyRoute(() => import("./pages/PublicPortfolio"));
+const ResourceHub = LazyRoute(() => import("@/pages/ResourceHub"));
+const StudyRooms = LazyRoute(() => import("./components/StudyRooms"));
+const Room = LazyRoute(() => import("./components/Room/Room"));
+const Contact = LazyRoute(() => import("./pages/Contact"));
+const PrivacyPolicy = LazyRoute(() => import("./pages/privacy"));
+const CookiesPolicy = LazyRoute(() => import("./pages/cookies-policy"));
+const PeerReviewDashboard = LazyRoute(() => import("./pages/PeerReviewDashboard"));
+const SubmitForReview = LazyRoute(() => import("./pages/SubmitForReview"));
+const ReviewSubmission = LazyRoute(() => import("./pages/ReviewSubmission"));
+const MockInterview = LazyRoute(() => import("./pages/MockInterview"));
+const TermsAndConditions = LazyRoute(() => import("./pages/TermsAndConditions"));
 
 const queryClient = new QueryClient();
 
@@ -102,8 +119,7 @@ function AppContent() {
       <MouseSparkles />
       <CookieConsentBanner />
 
-      <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#020617]"><div className="h-10 w-10 animate-spin rounded-full border-4 border-cyan-400 border-t-transparent" /></div>}>
-        <Routes>
+      <Routes>
           <Route
             path="/"
             element={user ? <Navigate to="/dashboard" replace /> : <WithNav><Index /></WithNav>}
@@ -369,8 +385,7 @@ function AppContent() {
           />
 
           <Route path="*" element={<NotFound />} />
-        </Routes>
-      </Suspense>
+      </Routes>
 
       {user && (
         <>
