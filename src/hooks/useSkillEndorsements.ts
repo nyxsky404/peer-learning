@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -24,9 +24,11 @@ export function useSkillEndorsements({
   skills,
 }: UseSkillEndorsementsOptions): UseSkillEndorsementsReturn {
   const { toast } = useToast();
+  const skillsKey = JSON.stringify(skills);
+  const stableSkills = useMemo(() => JSON.parse(skillsKey) as string[], [skillsKey]);
 
   const [endorsements, setEndorsements] = useState<Record<string, SkillEndorsementData>>(() =>
-    Object.fromEntries(skills.map((s) => [s, { count: 0, hasEndorsed: false }]))
+    Object.fromEntries(stableSkills.map((s) => [s, { count: 0, hasEndorsed: false }]))
   );
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -41,7 +43,7 @@ export function useSkillEndorsements({
   }, []);
 
   const fetchEndorsements = useCallback(async () => {
-    if (!skills.length) {
+    if (!stableSkills.length) {
       setLoading(false);
       return;
     }
@@ -51,12 +53,12 @@ export function useSkillEndorsements({
         .from("skill_endorsements")
         .select("skill, endorser_id")
         .eq("endorsed_user_id", profileUserId)
-        .in("skill", skills);
+        .in("skill", stableSkills);
 
       if (error) throw error;
 
       const map: Record<string, SkillEndorsementData> = Object.fromEntries(
-        skills.map((s) => [s, { count: 0, hasEndorsed: false }])
+        stableSkills.map((s) => [s, { count: 0, hasEndorsed: false }])
       );
 
       for (const row of data ?? []) {
@@ -73,7 +75,7 @@ export function useSkillEndorsements({
     } finally {
       setLoading(false);
     }
-  }, [profileUserId, skills, currentUserId]);
+  }, [profileUserId, stableSkills, currentUserId]);
 
   useEffect(() => {
     if (authReady) fetchEndorsements();
