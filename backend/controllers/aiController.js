@@ -307,6 +307,16 @@ export const conductMockInterview = async (req, res, next) => {
       return res.status(400).json({ error: "Role is required" });
     }
 
+    for (const m of messages) {
+      if (
+        !m ||
+        typeof m !== "object" ||
+        (m.role !== "user" && m.role !== "assistant")
+      ) {
+        return res.status(400).json({ error: "Messages can only contain user or assistant roles." });
+      }
+    }
+
     const latestMessage = messages[messages.length - 1].content;
     if (typeof latestMessage !== "string" || latestMessage.length > 2000) {
       return res.status(400).json({ error: "Message exceeds maximum length" });
@@ -324,7 +334,7 @@ export const conductMockInterview = async (req, res, next) => {
         3. Provide very brief, constructive feedback on their previous answer (if applicable), then ask the next question.
         4. Do not break character. Do not provide a list of questions at once.`,
       },
-      ...messages.slice(-20).map(m => ({ role: m.role || "user", content: m.content || "" }))
+      ...messages.slice(-20).map(m => ({ role: m.role, content: m.content || "" }))
     ];
 
     const data = await callOpenRouter({
