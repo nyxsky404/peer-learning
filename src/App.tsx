@@ -63,6 +63,7 @@ const Signup = LazyRoute(() => import("./pages/Signup"));
 const Onboarding = LazyRoute(() => import("./pages/Onboarding"));
 const Profile = LazyRoute(() => import("./pages/Profile"));
 const EditProfile = LazyRoute(() => import("./pages/EditProfile"));
+const Settings = LazyRoute(() => import("./pages/Settings"));
 const Notifications = LazyRoute(() => import("./pages/Notifications"));
 const Leaderboard = LazyRoute(() => import("./pages/Leaderboard"));
 const Admin = LazyRoute(() => import("./pages/Admin"));
@@ -358,6 +359,15 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <EditProfile />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <Settings />
               </ProtectedRoute>
             }
           />

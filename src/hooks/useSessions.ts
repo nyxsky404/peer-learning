@@ -23,6 +23,18 @@ export function useSessions(user: any) {
 
   const [activities, setActivities] = useState<any[]>([]);
   const [userStatus, setUserStatus] = useState("Active");
+  const [isFocusMode, setIsFocusMode] = useState(false);
+  const isFocusModeRef = useRef(isFocusMode);
+
+  useEffect(() => {
+    isFocusModeRef.current = isFocusMode;
+    if (isFocusMode) {
+      setUserStatus("Busy");
+    } else {
+      setUserStatus("Active");
+    }
+  }, [isFocusMode]);
+
   const [typingUser, setTypingUser] = useState<string | null>(null);
   const [participantCount, setParticipantCount] = useState(1);
   const [isVideoActive, setIsVideoActive] = useState(false);
@@ -197,10 +209,13 @@ export function useSessions(user: any) {
 
   useEffect(() => {
     const handleActivity = () => {
+      if (isFocusModeRef.current) return;
       setUserStatus("Active");
       clearTimeout(idleTimerRef.current);
       idleTimerRef.current = setTimeout(() => {
-        setUserStatus("Idle");
+        if (!isFocusModeRef.current) {
+          setUserStatus("Idle");
+        }
       }, 15000);
     };
 
@@ -370,6 +385,8 @@ export function useSessions(user: any) {
     sessionSummary,
     summaryLoading,
     studyTime,
+    isFocusMode,
+    setIsFocusMode,
     handleJoinSession,
     sendMessage,
     sendTypingEvent,

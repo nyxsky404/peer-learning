@@ -28,6 +28,8 @@ export default function Sessions() {
     sessionSummary,
     summaryLoading,
     studyTime,
+    isFocusMode,
+    setIsFocusMode,
     handleJoinSession,
     sendMessage,
     sendTypingEvent,
@@ -94,6 +96,8 @@ export default function Sessions() {
               sessionSummary={sessionSummary}
               summaryLoading={summaryLoading}
               studyTime={studyTime}
+              isFocusMode={isFocusMode}
+              setIsFocusMode={setIsFocusMode}
               sendMessage={sendMessage}
               sendTypingEvent={sendTypingEvent}
               handleLeaveVideo={handleLeaveVideo}

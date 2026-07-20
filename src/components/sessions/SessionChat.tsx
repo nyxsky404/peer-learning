@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from "react";
-import { Send, Video, Sparkles } from "lucide-react";
+import { Send, Video, Sparkles, BellOff, Bell, Download } from "lucide-react";
 import { LiveCodeRunner } from "@/components/studyroom/LiveCodeRunner";
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 
@@ -14,6 +14,8 @@ type SessionChatProps = {
   sessionSummary: any;
   summaryLoading: boolean;
   studyTime: number;
+  isFocusMode: boolean;
+  setIsFocusMode: (val: boolean) => void;
   sendMessage: (msg: string) => void;
   sendTypingEvent: () => void;
   handleLeaveVideo: () => void;
@@ -32,6 +34,8 @@ export function SessionChat({
   sessionSummary,
   summaryLoading,
   studyTime,
+  isFocusMode,
+  setIsFocusMode,
   sendMessage,
   sendTypingEvent,
   handleLeaveVideo,
@@ -54,6 +58,42 @@ export function SessionChat({
       .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
   };
 
+  const handleExport = () => {
+    if (!selectedSession) return;
+    
+    let content = `# Study Session Export: ${selectedSession.title}\n\n`;
+    
+    if (sessionSummary) {
+      content += `## AI Summary\n\n${sessionSummary.summary}\n\n`;
+      if (sessionSummary.key_takeaways?.length > 0) {
+        content += `### Key Takeaways\n`;
+        sessionSummary.key_takeaways.forEach((takeaway: string) => {
+          content += `- ${takeaway}\n`;
+        });
+        content += `\n`;
+      }
+    }
+
+    content += `## Chat Logs\n\n`;
+    messages.forEach((msg) => {
+      const time = new Date(msg.created_at).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      content += `**[${time}] ${msg.username}:**\n${msg.message}\n\n`;
+    });
+
+    const blob = new Blob([content], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Session_Export_${selectedSession.title?.replace(/\s+/g, '_') || "Log"}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="bg-white/5 border border-white/10 backdrop-blur-2xl rounded-3xl p-5 flex flex-col h-[750px]">
       {selectedSession ? (
@@ -73,12 +113,27 @@ export function SessionChat({
                     className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm border w-fit ${
                       userStatus === "Active"
                         ? "bg-cyan-500/10 border-cyan-400/20 text-cyan-300"
+                        : userStatus === "Busy"
+                        ? "bg-red-500/10 border-red-400/20 text-red-300"
                         : "bg-yellow-500/10 border-yellow-400/20 text-yellow-300"
                     }`}
                   >
-                    {userStatus === "Active" ? "⚡" : "🌙"}
+                    {userStatus === "Active" ? "⚡ " : userStatus === "Busy" ? "⛔ " : "🌙 "}
                     {userStatus}
                   </div>
+
+                  <button
+                    onClick={() => setIsFocusMode(!isFocusMode)}
+                    className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm border w-fit transition-colors ${
+                      isFocusMode
+                        ? "bg-red-500/10 border-red-400/20 text-red-300"
+                        : "bg-white/5 border-white/10 text-gray-300 hover:bg-white/10"
+                    }`}
+                    title={isFocusMode ? "Disable Focus Mode" : "Enable Focus Mode (Sets status to Busy and silences notifications)"}
+                  >
+                    {isFocusMode ? <BellOff size={14} /> : <Bell size={14} />}
+                    Focus Mode
+                  </button>
                 </div>
 
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
@@ -104,6 +159,15 @@ export function SessionChat({
                 </div>
               </div>
             </div>
+            
+            <button
+              onClick={handleExport}
+              title="Export Session Notes and Chat"
+              className="flex items-center gap-2 bg-white/5 border border-white/10 text-cyan-300 hover:text-cyan-200 hover:bg-white/10 px-4 py-2 rounded-xl transition-all shadow-sm"
+            >
+              <Download size={18} />
+              <span className="hidden md:inline">Export</span>
+            </button>
           </div>
 
           {isVideoActive && (
